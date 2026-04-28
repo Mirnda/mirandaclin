@@ -1,4 +1,4 @@
-module github.com/mirandev/mirandaclin
+module github.com/Mirnda/mirandaclin
 
 go 1.26.1
 

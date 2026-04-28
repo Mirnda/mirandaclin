@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/mirandev/mirandaclin/internal/infra/cache"
+	"github.com/Mirnda/mirandaclin/internal/infra/cache"
 	"gorm.io/gorm"
 )
 

@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
+	dentistblock "github.com/Mirnda/mirandaclin/internal/domain/dentist_block"
+	dentistclinic "github.com/Mirnda/mirandaclin/internal/domain/dentist_clinic"
+	"github.com/Mirnda/mirandaclin/pkg/logger"
 	"github.com/google/uuid"
-	dentistblock "github.com/mirandev/mirandaclin/internal/domain/dentist_block"
-	dentistclinic "github.com/mirandev/mirandaclin/internal/domain/dentist_clinic"
-	"github.com/mirandev/mirandaclin/pkg/logger"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )

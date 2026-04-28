@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	dentistblock "github.com/Mirnda/mirandaclin/internal/domain/dentist_block"
 	"github.com/google/uuid"
-	dentistblock "github.com/mirandev/mirandaclin/internal/domain/dentist_block"
 	"gorm.io/gorm"
 )
 

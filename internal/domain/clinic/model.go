@@ -3,9 +3,9 @@ package clinic
 import (
 	"time"
 
+	"github.com/Mirnda/mirandaclin/internal/domain/shared"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
-	"github.com/mirandev/mirandaclin/internal/domain/shared"
 	"gorm.io/gorm"
 )
 

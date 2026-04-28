@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/Mirnda/mirandaclin/internal/domain/clinic"
 	"github.com/google/uuid"
-	"github.com/mirandev/mirandaclin/internal/domain/clinic"
 	"gorm.io/gorm"
 )
 

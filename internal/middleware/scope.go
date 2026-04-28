@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/mirandev/mirandaclin/pkg/response"
+	"github.com/Mirnda/mirandaclin/pkg/response"
 )
 
 // RequireScope exige que o token contenha o scope especificado.

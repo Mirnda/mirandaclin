@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/Mirnda/mirandaclin/internal/domain/appointment"
 	"github.com/google/uuid"
-	"github.com/mirandev/mirandaclin/internal/domain/appointment"
 	"gorm.io/gorm"
 )
 

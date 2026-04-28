@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/Mirnda/mirandaclin/pkg/logger"
 	"github.com/google/uuid"
-	"github.com/mirandev/mirandaclin/pkg/logger"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )

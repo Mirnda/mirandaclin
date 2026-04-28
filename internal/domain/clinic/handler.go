@@ -5,12 +5,12 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/Mirnda/mirandaclin/internal/domain/shared"
+	"github.com/Mirnda/mirandaclin/internal/middleware"
+	"github.com/Mirnda/mirandaclin/pkg/response"
+	"github.com/Mirnda/mirandaclin/pkg/validator"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
-	"github.com/mirandev/mirandaclin/internal/domain/shared"
-	"github.com/mirandev/mirandaclin/internal/middleware"
-	"github.com/mirandev/mirandaclin/pkg/response"
-	"github.com/mirandev/mirandaclin/pkg/validator"
 )
 
 type Handler struct {

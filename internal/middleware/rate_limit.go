@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/mirandev/mirandaclin/internal/infra/cache"
-	"github.com/mirandev/mirandaclin/pkg/response"
+	"github.com/Mirnda/mirandaclin/internal/infra/cache"
+	"github.com/Mirnda/mirandaclin/pkg/response"
 )
 
 // RateLimit implementa sliding window por IP usando Redis (ou Noop).

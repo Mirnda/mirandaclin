@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Mirnda/mirandaclin/pkg/response"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/mirandev/mirandaclin/pkg/response"
 )
 
 // Claims representa o payload do JWT local emitido pela aplicação.
