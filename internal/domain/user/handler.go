@@ -1,0 +1,146 @@
+package user
+
+import (
+	"encoding/json"
+	"errors"
+	"net/http"
+
+	"github.com/mirandev/mirandaclin/internal/middleware"
+	"github.com/mirandev/mirandaclin/pkg/response"
+	"github.com/mirandev/mirandaclin/pkg/validator"
+)
+
+type Handler struct {
+	svc *Service
+}
+
+func NewHandler(svc *Service) *Handler {
+	return &Handler{svc: svc}
+}
+
+type createUserRequest struct {
+	Email                 string `json:"email"                  validate:"required,email"`
+	Password              string `json:"password"               validate:"required,min=8"`
+	Role                  string `json:"role"                   validate:"required,oneof=admin dentist secretary patient"`
+	Phone                 string `json:"phone"`
+	HasWhatsapp           bool   `json:"has_whatsapp"`
+	EmergencyContactName  string `json:"emergency_contact_name"`
+	EmergencyContactPhone string `json:"emergency_contact_phone"`
+	FullName              string `json:"full_name"              validate:"required"`
+	Document              string `json:"document"`
+}
+
+type loginRequest struct {
+	Email    string `json:"email"    validate:"required,email"`
+	Password string `json:"password" validate:"required"`
+}
+
+// @Summary     Criar usuário
+// @Tags        users
+// @Security    BearerAuth
+// @Accept      json
+// @Produce     json
+// @Param       body body createUserRequest true "Dados do usuário"
+// @Success     201 {object} response.Response{data=User}
+// @Failure     400 {object} response.Response
+// @Failure     409 {object} response.Response
+// @Router      /v1/api/users [post]
+func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	var req createUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.Error(w, http.StatusBadRequest, "payload inválido")
+		return
+	}
+	if errs := validator.Validate(req); errs != nil {
+		response.Error(w, http.StatusBadRequest, "dados inválidos")
+		return
+	}
+
+	tenantID := middleware.TenantFromContext(r.Context())
+	u, err := h.svc.Create(r.Context(), CreateRequest{
+		TenantID:              tenantID,
+		Email:                 req.Email,
+		Password:              req.Password,
+		Role:                  req.Role,
+		Phone:                 req.Phone,
+		HasWhatsapp:           req.HasWhatsapp,
+		EmergencyContactName:  req.EmergencyContactName,
+		EmergencyContactPhone: req.EmergencyContactPhone,
+		FullName:              req.FullName,
+		Document:              req.Document,
+	})
+	if errors.Is(err, ErrEmailConflict) {
+		response.Error(w, http.StatusConflict, err.Error())
+		return
+	}
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "erro interno")
+		return
+	}
+	response.Created(w, "usuário criado com sucesso", u)
+}
+
+// @Summary     Login
+// @Tags        auth
+// @Accept      json
+// @Produce     json
+// @Param       body body loginRequest true "Credenciais"
+// @Success     200 {object} response.Response{data=map[string]string}
+// @Failure     401 {object} response.Response
+// @Router      /v1/api/auth/login [post]
+func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	var req loginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.Error(w, http.StatusBadRequest, "payload inválido")
+		return
+	}
+	if errs := validator.Validate(req); errs != nil {
+		response.Error(w, http.StatusBadRequest, "dados inválidos")
+		return
+	}
+
+	tenantID := middleware.TenantFromContext(r.Context())
+	token, err := h.svc.Login(r.Context(), LoginRequest{
+		TenantID: tenantID,
+		Email:    req.Email,
+		Password: req.Password,
+	})
+	if errors.Is(err, ErrInvalidCreds) {
+		response.Error(w, http.StatusUnauthorized, "credenciais inválidas")
+		return
+	}
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "erro interno")
+		return
+	}
+	response.OK(w, "autenticado com sucesso", map[string]string{"token": token})
+}
+
+// @Summary     Obter usuário por ID
+// @Tags        users
+// @Security    BearerAuth
+// @Produce     json
+// @Param       id path string true "User ID"
+// @Success     200 {object} response.Response{data=User}
+// @Failure     404 {object} response.Response
+// @Router      /v1/api/users/{id} [get]
+func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
+	id, err := parseUUID(r.PathValue("id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+	tenantID := middleware.TenantFromContext(r.Context())
+	u, err := h.svc.GetByID(r.Context(), tenantID, id)
+	if errors.Is(err, ErrUserNotFound) {
+		response.Error(w, http.StatusNotFound, "usuário não encontrado")
+		return
+	}
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "erro interno")
+		return
+	}
+	response.OK(w, "ok", u)
+}
