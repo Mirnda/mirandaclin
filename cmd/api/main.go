@@ -21,11 +21,9 @@ import (
 	infraCache "github.com/Mirnda/mirandaclin/internal/infra/cache"
 	infraDB "github.com/Mirnda/mirandaclin/internal/infra/db"
 	"github.com/Mirnda/mirandaclin/internal/infra/repository"
-	"github.com/Mirnda/mirandaclin/internal/middleware"
 	"github.com/Mirnda/mirandaclin/pkg/config"
 	"github.com/Mirnda/mirandaclin/pkg/logger"
 	"github.com/joho/godotenv"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
 	// modelos para AutoMigrate
@@ -87,61 +85,16 @@ func main() {
 	consultSvc := consultation.NewService(db, consultRepo, log)
 
 	// Handlers
-	userH := user.NewHandler(userSvc)
-	clinicH := clinic.NewHandler(clinicSvc)
-	apptH := appointment.NewHandler(apptSvc)
-	consultH := consultation.NewHandler(consultSvc)
-	healthH := health.NewHandler(db, cache)
-
-	// Router
-	mux := http.NewServeMux()
-
-	// Observabilidade (sem autenticação — proteger por Security Group na AWS)
-	mux.Handle("GET /metrics", promhttp.Handler())
-	mux.HandleFunc("GET /health", healthH.Liveness)
-	mux.HandleFunc("GET /health/ready", healthH.Readiness)
-
-	// Auth (rate limit agressivo)
-	authRL := middleware.RateLimit(cache, 10, time.Minute)
-	mux.Handle("POST /v1/api/auth/login", authRL(http.HandlerFunc(userH.Login)))
-
-	// Rotas autenticadas
-	authMw := middleware.Auth(cfg.JWTSecret)
-	generalRL := middleware.RateLimit(cache, 120, time.Minute)
-
-	protect := func(h http.Handler) http.Handler {
-		return generalRL(authMw(h))
+	h := handlers{
+		user:         user.NewHandler(userSvc),
+		clinic:       clinic.NewHandler(clinicSvc),
+		appointment:  appointment.NewHandler(apptSvc),
+		consultation: consultation.NewHandler(consultSvc),
+		health:       health.NewHandler(db, cache),
 	}
 
-	// Users
-	mux.Handle("POST /v1/api/users", protect(http.HandlerFunc(userH.Create)))
-	mux.Handle("GET /v1/api/users/{id}", protect(http.HandlerFunc(userH.GetByID)))
-
-	// Clinics
-	mux.Handle("POST /v1/api/clinics", protect(http.HandlerFunc(clinicH.Create)))
-	mux.Handle("GET /v1/api/clinics", protect(http.HandlerFunc(clinicH.List)))
-	mux.Handle("GET /v1/api/clinics/{id}", protect(http.HandlerFunc(clinicH.GetByID)))
-	mux.Handle("DELETE /v1/api/clinics/{id}", protect(http.HandlerFunc(clinicH.Delete)))
-
-	// Appointments
-	mux.Handle("POST /v1/api/appointments", protect(http.HandlerFunc(apptH.Create)))
-	mux.Handle("GET /v1/api/appointments/patient/{patient_id}", protect(http.HandlerFunc(apptH.ListByPatient)))
-	mux.Handle("PATCH /v1/api/appointments/{id}/cancel", protect(http.HandlerFunc(apptH.Cancel)))
-
-	// Consultations
-	reportRL := middleware.RateLimit(cache, 30, time.Minute)
-	mux.Handle("POST /v1/api/consultations", protect(http.HandlerFunc(consultH.Create)))
-	mux.Handle("GET /v1/api/consultations/patient/{patient_id}", reportRL(authMw(http.HandlerFunc(consultH.ListByPatient))))
-	mux.Handle("GET /v1/api/consultations/dentist/{dentist_id}", reportRL(authMw(http.HandlerFunc(consultH.ListByDentist))))
-
-	// Stack global de middlewares
-	handler := middleware.RequestID(
-		middleware.SecurityHeaders(cfg.AppEnv)(
-			middleware.CORS(cfg.CORSAllowedOrigins)(
-				middleware.Metrics(mux),
-			),
-		),
-	)
+	mux := http.NewServeMux()
+	handler := registerRoutes(mux, h, cfg, cache)
 
 	addr := ":" + cfg.AppPort
 	log.Info("servidor iniciando", zap.String("addr", addr), zap.String("env", cfg.AppEnv))
