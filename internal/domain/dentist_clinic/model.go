@@ -15,7 +15,7 @@ type DentistClinic struct {
 	TenantID            uuid.UUID      `gorm:"type:uuid;not null;index"                              json:"tenant_id"`
 	DentistID           uuid.UUID      `gorm:"type:uuid;not null;uniqueIndex:udx_dentist_clinic,priority:1" json:"dentist_id"`
 	ClinicID            uuid.UUID      `gorm:"type:uuid;not null;uniqueIndex:udx_dentist_clinic,priority:2" json:"clinic_id"`
-	WorkingDays         pq.StringArray `gorm:"type:text[]"                                           json:"working_days"` // "monday"..."sunday"
+	WorkingDays         pq.StringArray `gorm:"type:text[]" json:"working_days" swaggertype:"array,string"` // "monday"..."sunday"
 	StartTime           string         `json:"start_time"`                                                                // "08:00"
 	EndTime             string         `json:"end_time"`                                                                  // "17:00"
 	SlotDurationMinutes int            `gorm:"default:30"                                            json:"slot_duration_minutes"`

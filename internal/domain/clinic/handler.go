@@ -22,12 +22,12 @@ func NewHandler(svc *Service) *Handler {
 }
 
 type createClinicRequest struct {
-	Name          string        `json:"name"           validate:"required"`
-	Phone         string        `json:"phone"`
+	Name          string         `json:"name"           validate:"required"`
+	Phone         string         `json:"phone"`
 	Address       shared.Address `json:"address"`
-	OperatingDays []string      `json:"operating_days"`
-	OpenTime      string        `json:"open_time"`
-	CloseTime     string        `json:"close_time"`
+	OperatingDays []string       `json:"operating_days"`
+	OpenTime      string         `json:"open_time"`
+	CloseTime     string         `json:"close_time"`
 }
 
 // @Summary     Criar clínica
