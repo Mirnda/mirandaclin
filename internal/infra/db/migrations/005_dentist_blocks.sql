@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS dentist_blocks (
     start_time   TEXT,
     end_time     TEXT,
     reason       TEXT,
-    created_at   TIMESTAMPTZ
+    created_at   TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_dentist_blocks_tenant_id  ON dentist_blocks(tenant_id);

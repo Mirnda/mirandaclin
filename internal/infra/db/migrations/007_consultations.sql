@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS consultations (
     dentist_id     UUID NOT NULL,
     diagnosis      TEXT,
     treatment      TEXT,
-    created_at     TIMESTAMPTZ
+    created_at     TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_consultations_tenant_id  ON consultations(tenant_id);

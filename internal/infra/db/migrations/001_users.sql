@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
     has_whatsapp            BOOLEAN NOT NULL DEFAULT false,
     emergency_contact_name  TEXT,
     emergency_contact_phone TEXT,
-    created_at              TIMESTAMPTZ,
+    created_at              TIMESTAMPTZ DEFAULT NOW(),
     updated_at              TIMESTAMPTZ,
     deleted_at              TIMESTAMPTZ
 );

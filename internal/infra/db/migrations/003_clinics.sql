@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS clinics (
     operating_days       TEXT[],
     open_time            TEXT,
     close_time           TEXT,
-    created_at           TIMESTAMPTZ,
+    created_at           TIMESTAMPTZ DEFAULT NOW(),
     updated_at           TIMESTAMPTZ,
     deleted_at           TIMESTAMPTZ
 );
