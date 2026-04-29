@@ -1,6 +1,14 @@
 package logger
 
-import "go.uber.org/zap"
+import (
+	"context"
+
+	"go.uber.org/zap"
+)
+
+type ctxKey struct{}
+
+var loggerKey = ctxKey{}
 
 type zapLogger struct {
 	z *zap.Logger
@@ -16,6 +24,13 @@ func New(env string) Logger {
 		z, _ = zap.NewProduction()
 	}
 	return &zapLogger{z: z}
+}
+
+func FromContext(ctx context.Context) Logger {
+	if l, ok := ctx.Value(loggerKey).(Logger); ok {
+		return l
+	}
+	return &zapLogger{z: zap.NewNop()}
 }
 
 func (l *zapLogger) Info(msg string, fields ...Field)  { l.z.Info(msg, fields...) }

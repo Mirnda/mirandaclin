@@ -25,11 +25,6 @@ import (
 	"github.com/Mirnda/mirandaclin/pkg/logger"
 	"github.com/joho/godotenv"
 	"go.uber.org/zap"
-
-	// modelos para AutoMigrate
-	dentistblock "github.com/Mirnda/mirandaclin/internal/domain/dentist_block"
-	dentistclinic "github.com/Mirnda/mirandaclin/internal/domain/dentist_clinic"
-	"github.com/Mirnda/mirandaclin/internal/domain/profile"
 )
 
 func main() {
@@ -49,16 +44,8 @@ func main() {
 		log.Error("falha ao conectar banco", zap.Error(err))
 		panic(err)
 	}
-	if err := db.AutoMigrate(
-		&user.User{},
-		&profile.Profile{},
-		&clinic.Clinic{},
-		&dentistclinic.DentistClinic{},
-		&dentistblock.DentistBlock{},
-		&appointment.Appointment{},
-		&consultation.Consultation{},
-	); err != nil {
-		log.Error("falha no AutoMigrate", zap.Error(err))
+	if err := infraDB.Migrate(db); err != nil {
+		log.Error("falha na migration", zap.Error(err))
 		panic(err)
 	}
 

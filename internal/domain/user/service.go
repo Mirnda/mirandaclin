@@ -18,9 +18,9 @@ import (
 )
 
 var (
-	ErrEmailConflict  = errors.New("email já cadastrado neste tenant")
-	ErrInvalidCreds   = errors.New("credenciais inválidas")
-	ErrUserNotFound   = errors.New("usuário não encontrado")
+	ErrEmailConflict = errors.New("email já cadastrado neste tenant")
+	ErrInvalidCreds  = errors.New("credenciais inválidas")
+	ErrUserNotFound  = errors.New("usuário não encontrado")
 )
 
 type CreateRequest struct {
@@ -152,7 +152,7 @@ func hashPassword(password string) (salt, hash string, err error) {
 		return
 	}
 	salt = hex.EncodeToString(b)
-	h, err := bcrypt.GenerateFromPassword([]byte(password+salt), bcrypt.DefaultCost)
+	h, err := bcrypt.GenerateFromPassword([]byte(password+salt), 12)
 	if err != nil {
 		return
 	}

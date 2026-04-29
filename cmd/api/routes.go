@@ -34,6 +34,11 @@ func registerRoutes(mux *http.ServeMux, h handlers, cfg *config.Config, c cache.
 		return generalRL(authMw(handler))
 	}
 
+	// Swagger — disponível apenas fora de produção
+	if cfg.AppEnv != "production" {
+		registerSwagger(mux)
+	}
+
 	// Observabilidade — sem autenticação (proteger por Security Group na AWS)
 	mux.Handle("GET /metrics", promhttp.Handler())
 	mux.HandleFunc("GET /health", h.health.Liveness)
