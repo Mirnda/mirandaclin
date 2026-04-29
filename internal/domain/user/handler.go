@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/Mirnda/mirandaclin/internal/middleware"
+	"github.com/Mirnda/mirandaclin/pkg/logger"
 	"github.com/Mirnda/mirandaclin/pkg/response"
 	"github.com/Mirnda/mirandaclin/pkg/validator"
 )
@@ -75,6 +76,11 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
+		h.svc.log.Error("erro ao criar usuário",
+			logger.String("tenant_id", tenantID.String()),
+			logger.String("request_id", middleware.RequestIDFromContext(r.Context())),
+			logger.Err(err),
+		)
 		response.Error(w, http.StatusInternalServerError, "erro interno")
 		return
 	}
@@ -90,6 +96,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 // @Failure     401 {object} response.Response
 // @Router      /v1/api/auth/login [post]
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+	h.svc.log.Debug("init h Login")
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -100,6 +107,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusBadRequest, "dados inválidos")
 		return
 	}
+	h.svc.log.Debug("pass validate")
 
 	tenantID := middleware.TenantFromContext(r.Context())
 	token, err := h.svc.Login(r.Context(), LoginRequest{
@@ -112,9 +120,15 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
+		h.svc.log.Error("erro ao autenticar usuário",
+			logger.String("request_id", middleware.RequestIDFromContext(r.Context())),
+			logger.Err(err),
+		)
 		response.Error(w, http.StatusInternalServerError, "erro interno")
 		return
 	}
+
+	h.svc.log.Debug("sucesso")
 	response.OK(w, "autenticado com sucesso", map[string]string{"token": token})
 }
 
@@ -139,6 +153,12 @@ func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
+		h.svc.log.Error("erro ao buscar usuário",
+			logger.String("tenant_id", tenantID.String()),
+			logger.String("request_id", middleware.RequestIDFromContext(r.Context())),
+			logger.String("user_id", id.String()),
+			logger.Err(err),
+		)
 		response.Error(w, http.StatusInternalServerError, "erro interno")
 		return
 	}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/Mirnda/mirandaclin/internal/domain/shared"
 	"github.com/Mirnda/mirandaclin/internal/middleware"
+	"github.com/Mirnda/mirandaclin/pkg/logger"
 	"github.com/Mirnda/mirandaclin/pkg/response"
 	"github.com/Mirnda/mirandaclin/pkg/validator"
 	"github.com/google/uuid"
@@ -61,6 +62,11 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		CloseTime:     req.CloseTime,
 	}
 	if err := h.svc.Create(r.Context(), c); err != nil {
+		h.svc.log.Error("erro ao criar clínica",
+			logger.String("tenant_id", tenantID.String()),
+			logger.String("request_id", middleware.RequestIDFromContext(r.Context())),
+			logger.Err(err),
+		)
 		response.Error(w, http.StatusInternalServerError, "erro interno")
 		return
 	}
@@ -77,6 +83,11 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	tenantID := middleware.TenantFromContext(r.Context())
 	items, err := h.svc.List(r.Context(), tenantID)
 	if err != nil {
+		h.svc.log.Error("erro ao listar clínicas",
+			logger.String("tenant_id", tenantID.String()),
+			logger.String("request_id", middleware.RequestIDFromContext(r.Context())),
+			logger.Err(err),
+		)
 		response.Error(w, http.StatusInternalServerError, "erro interno")
 		return
 	}
@@ -104,6 +115,12 @@ func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
+		h.svc.log.Error("erro ao buscar clínica",
+			logger.String("tenant_id", tenantID.String()),
+			logger.String("request_id", middleware.RequestIDFromContext(r.Context())),
+			logger.String("clinic_id", id.String()),
+			logger.Err(err),
+		)
 		response.Error(w, http.StatusInternalServerError, "erro interno")
 		return
 	}
@@ -125,6 +142,12 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	tenantID := middleware.TenantFromContext(r.Context())
 	if err := h.svc.Delete(r.Context(), tenantID, id); err != nil {
+		h.svc.log.Error("erro ao remover clínica",
+			logger.String("tenant_id", tenantID.String()),
+			logger.String("request_id", middleware.RequestIDFromContext(r.Context())),
+			logger.String("clinic_id", id.String()),
+			logger.Err(err),
+		)
 		response.Error(w, http.StatusInternalServerError, "erro interno")
 		return
 	}
