@@ -15,11 +15,12 @@ Funcionalidades: cadastro de usuários, agendamentos, relatórios de consultas p
 | HTTP         | `net/http` stdlib (ServeMux) — sem framework                               |
 | ORM          | `gorm.io/gorm` + `gorm.io/driver/postgres`                                 |
 | Cache        | Redis (`redis/go-redis/v9`) com fallback `Noop`                            |
-| Auth         | JWT (`golang-jwt/jwt/v5`) + JWKS OAuth2/Google (`lestrrat-go/jwx/v2`)     |
+| Auth         | JWT HS256 (`golang-jwt/jwt/v5`) — `JWT_SECRET` é chave HMAC               |
 | Validação    | `go-playground/validator/v10`                                              |
 | Config       | `godotenv` — carrega `.env` antes de `os.Getenv`                           |
 | Log          | `go.uber.org/zap` (produção: JSON estruturado; dev: console colorido)      |
-| Docs         | Swagger via `swaggo/swag` (`make swagger`)                                 |
+| Docs         | Swagger via `swaggo/swag` + `swaggo/http-swagger/v2` (`make swagger`)     |
+| Métricas     | `prometheus/client_golang` — endpoint `/metrics`                           |
 | CI/CD        | GitHub Actions                                                             |
 | Container    | Docker + docker-compose                                                    |
 
@@ -31,37 +32,86 @@ Funcionalidades: cadastro de usuários, agendamentos, relatórios de consultas p
 .
 ├── cmd/
 │   └── api/
-│       └── main.go                  # entrypoint: carrega .env, inicializa DB/cache/router
+│       ├── main.go                  # entrypoint: carrega .env, inicializa DB/cache/router
+│       └── routes.go                # registerRoutes: registra todas as rotas + stack de middlewares
 ├── internal/
 │   ├── domain/
+│   │   ├── shared/
+│   │   │   └── address.go           # struct Address compartilhada (embedded em Profile e Clinic)
+│   │   ├── tenant/
+│   │   │   └── model.go             # struct Tenant (sem handler/service — gerenciado fora da API)
 │   │   ├── user/
-│   │   │   ├── model.go             # struct GORM + constantes de role/scope
+│   │   │   ├── model.go             # struct GORM + constantes de role/scope + ScopeForRole
 │   │   │   ├── repository.go        # interface Repository
-│   │   │   ├── service.go           # regras de negócio
-│   │   │   └── handler.go           # handlers HTTP + anotações swagger
+│   │   │   ├── service.go           # Create, Login, GetByID; emite JWT HS256
+│   │   │   ├── handler.go           # handlers HTTP + anotações swagger
+│   │   │   ├── helpers.go           # funções auxiliares do domínio
+│   │   │   └── user_test.go
 │   │   ├── profile/
+│   │   │   ├── model.go             # sem timestamps/soft-delete
+│   │   │   └── repository.go
 │   │   ├── clinic/
+│   │   │   ├── model.go
+│   │   │   ├── repository.go
+│   │   │   ├── service.go
+│   │   │   └── handler.go
 │   │   ├── dentist_clinic/
+│   │   │   ├── model.go             # sem handler/service — usado internamente por appointment
+│   │   │   └── repository.go
 │   │   ├── dentist_block/
+│   │   │   ├── model.go             # sem handler/service — usado internamente por appointment
+│   │   │   └── repository.go
 │   │   ├── appointment/
+│   │   │   ├── model.go
+│   │   │   ├── repository.go
+│   │   │   ├── service.go
+│   │   │   └── handler.go
 │   │   └── consultation/
+│   │       ├── model.go
+│   │       ├── repository.go
+│   │       ├── service.go
+│   │       └── handler.go
+│   ├── health/
+│   │   └── handler.go               # Liveness (/health) e Readiness (/health/ready)
 │   ├── middleware/
-│   │   ├── auth.go                  # valida JWT, injeta claims no ctx
-│   │   ├── tenant.go                # extrai tenant_id do JWT, injeta no ctx
-│   │   └── scope.go                 # valida escopos por role
+│   │   ├── auth.go                  # valida JWT HS256, extrai tenant_id/user_id/role/scope e injeta no ctx
+│   │   ├── keys.go                  # context keys + TenantFromContext, UserIDFromContext, RoleFromContext, RequestIDFromContext
+│   │   ├── scope.go                 # RequireScope — admin:* concede acesso a qualquer scope
+│   │   ├── cors.go                  # CORS por lista de origens (CORS_ALLOWED_ORIGINS)
+│   │   ├── security_headers.go      # headers de segurança; CSP relaxado em /swagger/; HSTS fora de dev
+│   │   ├── rate_limit.go            # sliding window por IP via Redis (ou Noop)
+│   │   ├── request_id.go            # gera UUID v4, injeta no ctx, retorna em X-Request-ID
+│   │   └── metrics.go               # middleware Prometheus por rota
 │   └── infra/
 │       ├── db/
-│       │   └── gorm.go              # abre conexão GORM, AutoMigrate ou migra via SQL
+│       │   ├── gorm.go              # abre conexão GORM + pool (25 open, 5 idle, 5min lifetime); executa Migrate
+│       │   └── migrations/          # arquivos SQL embutidos via //go:embed, executados em ordem lexicográfica
+│       │       ├── 000_tenants.sql
+│       │       ├── 001_users.sql
+│       │       ├── 002_profiles.sql
+│       │       ├── 003_clinics.sql
+│       │       ├── 004_dentist_clinics.sql
+│       │       ├── 005_dentist_blocks.sql
+│       │       ├── 006_appointments.sql
+│       │       └── 007_consultations.sql
 │       ├── cache/
+│       │   ├── cache.go             # interface Cache: Get, Set, Del, Incr, Expire
 │       │   ├── redis.go
 │       │   └── noop.go
 │       └── repository/              # implementações concretas das interfaces de domínio
 │           ├── user_repository.go
+│           ├── profile_repository.go
 │           ├── clinic_repository.go
-│           └── ...
+│           ├── dentist_clinic_repository.go
+│           ├── dentist_block_repository.go
+│           ├── appointment_repository.go
+│           └── consultation_repository.go
 ├── pkg/
 │   ├── config/
-│   │   └── config.go                # lê variáveis de ambiente, valida obrigatórias
+│   │   └── config.go                # lê variáveis de ambiente; valida JWT_SECRET obrigatório e DB_SSLMODE em prod
+│   ├── logger/
+│   │   ├── logger.go                # interface Logger + alias Field
+│   │   └── zap.go                   # implementação zap + FromContext (retorna Noop se não injetado)
 │   ├── response/
 │   │   └── response.go              # helpers JSON: OK, Created, Error
 │   └── validator/
@@ -69,7 +119,7 @@ Funcionalidades: cadastro de usuários, agendamentos, relatórios de consultas p
 ├── docs/                            # gerado por swag init (não editar manualmente)
 ├── .env                             # não versionar — adicionar ao .gitignore
 ├── .env.example                     # versionar — valores de exemplo sem segredos
-├── Dockerfile
+├── Dockerfile                       # multi-stage: builder (golang:1.26-alpine) + runtime (alpine:3.21)
 ├── docker-compose.yml
 ├── Makefile
 └── go.mod
@@ -82,18 +132,20 @@ Funcionalidades: cadastro de usuários, agendamentos, relatórios de consultas p
 Cada domínio segue a mesma estrutura em camadas:
 
 ```
-model.go        → struct GORM, constantes, tipos
+model.go        → struct GORM, constantes, tipos; BeforeCreate gera UUID se nil
 repository.go   → interface com métodos que aceitam *gorm.DB (suporte a tx)
 service.go      → orquestra repositórios, aplica regras de negócio
 handler.go      → decodifica request, chama service, retorna response
 ```
+
+Domínios `dentist_clinic`, `dentist_block` e `profile` possuem apenas `model.go` + `repository.go` — são usados internamente por outros serviços, sem handler próprio.
 
 **Convenção de repositório — recebe `*gorm.DB` para suportar transações:**
 
 ```go
 type UserRepository interface {
     Create(ctx context.Context, db *gorm.DB, u *User) error
-    FindByID(ctx context.Context, db *gorm.DB, id uuid.UUID) (*User, error)
+    FindByID(ctx context.Context, db *gorm.DB, tenantID, id uuid.UUID) (*User, error)
     FindByEmail(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, email string) (*User, error)
     Update(ctx context.Context, db *gorm.DB, u *User) error
     Delete(ctx context.Context, db *gorm.DB, id uuid.UUID) error
@@ -103,11 +155,12 @@ type UserRepository interface {
 **Transações (GORM) — ex.: criar usuário + perfil atomicamente:**
 
 ```go
-err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
     if err := userRepo.Create(ctx, tx, user); err != nil {
         return err
     }
-    return profileRepo.Create(ctx, tx, profile)
+    p.UserID = user.ID
+    return profileRepo.Create(ctx, tx, p)
 })
 ```
 
@@ -121,7 +174,7 @@ db.WithContext(ctx).Where("tenant_id = ?", tenantID).Find(&users)
 
 ## Convenções de API
 
-**Prefixo de todas as rotas:** `/v1/api/`
+**Prefixo de todas as rotas de negócio:** `/v1/api/`
 
 **Resposta de sucesso simples:**
 ```json
@@ -150,13 +203,42 @@ db.WithContext(ctx).Where("tenant_id = ?", tenantID).Find(&users)
 
 ---
 
+## Rotas Registradas
+
+| Método | Rota | Middleware | Rate Limit |
+|--------|------|------------|-----------|
+| `GET` | `/swagger/` | — (apenas não-prod) | — |
+| `GET` | `/metrics` | — | — |
+| `GET` | `/health` | — | — |
+| `GET` | `/health/ready` | — | — |
+| `POST` | `/v1/api/auth/login` | — | 10 req/min por IP |
+| `POST` | `/v1/api/users` | Auth | 120 req/min por IP |
+| `GET` | `/v1/api/users/{id}` | Auth | 120 req/min por IP |
+| `POST` | `/v1/api/clinics` | Auth | 120 req/min por IP |
+| `GET` | `/v1/api/clinics` | Auth | 120 req/min por IP |
+| `GET` | `/v1/api/clinics/{id}` | Auth | 120 req/min por IP |
+| `DELETE` | `/v1/api/clinics/{id}` | Auth | 120 req/min por IP |
+| `POST` | `/v1/api/appointments` | Auth | 120 req/min por IP |
+| `GET` | `/v1/api/appointments/patient/{patient_id}` | Auth | 120 req/min por IP |
+| `PATCH` | `/v1/api/appointments/{id}/cancel` | Auth | 120 req/min por IP |
+| `POST` | `/v1/api/consultations` | Auth | 120 req/min por IP |
+| `GET` | `/v1/api/consultations/patient/{patient_id}` | Auth | 30 req/min por IP |
+| `GET` | `/v1/api/consultations/dentist/{dentist_id}` | Auth | 30 req/min por IP |
+
+**Stack global de middlewares (aplicado sobre o mux inteiro):**
+```
+RequestID → SecurityHeaders → CORS → Metrics → rotas
+```
+
+---
+
 ## Multi-Tenant
 
 Todas as tabelas de negócio possuem `tenant_id UUID NOT NULL`.
 
-- O `tenant_id` é extraído do JWT claims após autenticação.
+- O `tenant_id` é extraído dos claims do JWT após autenticação no middleware `auth.go`.
 - **Todo** acesso ao banco deve filtrar por `tenant_id` — nunca consultar sem esse filtro.
-- Middleware de tenant injeta o `tenant_id` no `context.Context`.
+- Não há middleware `tenant.go` separado — o `auth.go` já injeta `tenant_id` no contexto.
 
 ```go
 tenantID := middleware.TenantFromContext(ctx) // retorna uuid.UUID
@@ -167,84 +249,111 @@ tenantID := middleware.TenantFromContext(ctx) // retorna uuid.UUID
 ## Autenticação
 
 ### JWT Local (email/senha)
-- Hash de senha com `bcrypt` + salt aleatório por usuário.
-- Token assinado com chave privada RS256.
-- Claims: `sub` (user_id), `tenant_id`, `role`, `scope`.
+- Hash de senha com `bcrypt` (custo 12) + salt aleatório (16 bytes hex) por usuário.
+- Token assinado com **HS256** usando `JWT_SECRET` como chave HMAC.
+- Claims: `sub` (user_id), `tenant_id`, `role`, `scope`, `exp` (1h), `iat`.
+- Auth middleware valida `SigningMethodHMAC` — rejeita qualquer outro algoritmo.
 
-### OAuth2 / Google Sign-In
-- Valida token Google via JWKS endpoint (`JWT_JWKS_URL`).
-- Após validação, cria/busca usuário local e emite JWT próprio.
+```go
+// user/service.go — emissão do token
+claims := jwt.MapClaims{
+    "sub":       u.ID.String(),
+    "tenant_id": u.TenantID.String(),
+    "role":      u.Role,
+    "scope":     ScopeForRole(u.Role),
+    "exp":       time.Now().Add(time.Hour).Unix(),
+    "iat":       time.Now().Unix(),
+}
+jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(secret))
+```
 
 ### Scopes por role
 - `dentist:read dentist:write` — dentistas
 - `patient:read` — pacientes
-- `admin:*` — administradores da clínica
+- `admin:*` — administradores (concede acesso a qualquer scope via `RequireScope`)
+- Secretary: sem scope padrão definido (retorna string vazia em `ScopeForRole`)
 
 ---
 
 ## Domínios e Modelos
 
+### tenants
+
+```go
+type Tenant struct {
+    ID        uuid.UUID      `gorm:"type:uuid;primaryKey"`
+    Name      string         `gorm:"not null"`
+    CreatedAt time.Time
+    UpdatedAt time.Time
+    DeletedAt gorm.DeletedAt `gorm:"index"`
+}
+```
+
 ### users
 
 ```go
 type User struct {
-    ID                   uuid.UUID  `gorm:"type:uuid;primaryKey"`
-    TenantID             uuid.UUID  `gorm:"type:uuid;not null;index"`
-    Email                string     `gorm:"not null"`
-    PasswordHash         string
-    Salt                 string
-    Role                 string     // admin | dentist | secretary | patient
-    Phone                string
-    HasWhatsapp          bool       `gorm:"default:false"`
-    EmergencyContactName string
+    ID                    uuid.UUID      `gorm:"type:uuid;primaryKey"`
+    TenantID              uuid.UUID      `gorm:"type:uuid;not null;index"`
+    Email                 string         `gorm:"not null;uniqueIndex:udx_tenant_email,priority:2"`
+    PasswordHash          string         `json:"-"`
+    Salt                  string         `json:"-"`
+    Role                  string         // admin | dentist | secretary | patient
+    Phone                 string
+    HasWhatsapp           bool           `gorm:"default:false"`
+    EmergencyContactName  string
     EmergencyContactPhone string
-    CreatedAt            time.Time
-    UpdatedAt            time.Time
-    DeletedAt            gorm.DeletedAt `gorm:"index"` // soft delete
+    CreatedAt             time.Time
+    UpdatedAt             time.Time
+    DeletedAt             gorm.DeletedAt `gorm:"index"`
 }
 ```
 
+Índice único em banco: `(tenant_id, email)` — `udx_tenant_email`.
+
 ### profiles
-Criado em transação junto com `users`.
+
+Criado em transação junto com `users`. **Sem timestamps nem soft delete.**
 
 ```go
 type Profile struct {
-    ID           uuid.UUID `gorm:"type:uuid;primaryKey"`
-    UserID       uuid.UUID `gorm:"type:uuid;not null;uniqueIndex"`
-    TenantID     uuid.UUID `gorm:"type:uuid;not null;index"`
-    FullName     string
-    Document     string    // CPF
-    BirthDate    *time.Time
-    Address      Address
+    ID        uuid.UUID      `gorm:"type:uuid;primaryKey"`
+    UserID    uuid.UUID      `gorm:"type:uuid;not null;uniqueIndex"`
+    TenantID  uuid.UUID      `gorm:"type:uuid;not null;index"`
+    FullName  string
+    Document  string         // CPF
+    BirthDate *time.Time
+    Address   shared.Address `gorm:"embedded;embeddedPrefix:address_"`
 }
+```
 
+### shared.Address
+
+Struct compartilhada em `internal/domain/shared/address.go`, embedded em `Profile` e `Clinic` com prefixo `address_`.
+
+```go
 type Address struct {
-	PostalCode   string `json:"postal_code"`
-	Street       string `json:"street"`
-	Number       string `json:"number"`
-	Complement   string `json:"complement,omitempty"`
-	Neighborhood string `json:"neighborhood,omitempty"`
-	City         string `json:"city"`
-	State        string `json:"state"`
-	Country      string `json:"country"`
-	Latitude     string `json:"latitude,omitempty"`
-	Longitude    string `json:"longitude,omitempty"`
+    PostalCode   string
+    Street       string
+    Number       string
+    Complement   string
+    Neighborhood string
+    City         string
+    State        string
+    Country      string
 }
-
-
 ```
 
 ### clinics
 
 ```go
 type Clinic struct {
-    ID           uuid.UUID      `gorm:"type:uuid;primaryKey"`
-    TenantID     uuid.UUID      `gorm:"type:uuid;not null;index"`
-    Name         string         `gorm:"not null"`
-    Phone        string
-    Address      Address
-    // Dias de funcionamento: "monday","tuesday","wednesday","thursday","friday","saturday","sunday"
-    OperatingDays pq.StringArray `gorm:"type:text[]"`
+    ID            uuid.UUID      `gorm:"type:uuid;primaryKey"`
+    TenantID      uuid.UUID      `gorm:"type:uuid;not null;index"`
+    Name          string         `gorm:"not null"`
+    Phone         string
+    Address       shared.Address `gorm:"embedded;embeddedPrefix:address_"`
+    OperatingDays pq.StringArray `gorm:"type:text[]"` // "monday"..."sunday"
     OpenTime      string         // "08:00"
     CloseTime     string         // "18:00"
     CreatedAt     time.Time
@@ -254,15 +363,13 @@ type Clinic struct {
 ```
 
 ### dentist_clinics
-Vínculo entre dentista e clínica com horário de trabalho padrão.
 
 ```go
 type DentistClinic struct {
     ID                  uuid.UUID      `gorm:"type:uuid;primaryKey"`
     TenantID            uuid.UUID      `gorm:"type:uuid;not null;index"`
-    DentistID           uuid.UUID      `gorm:"type:uuid;not null"`
-    ClinicID            uuid.UUID      `gorm:"type:uuid;not null"`
-    // Dias que o dentista trabalha nessa clínica
+    DentistID           uuid.UUID      `gorm:"type:uuid;not null;uniqueIndex:udx_dentist_clinic,priority:1"`
+    ClinicID            uuid.UUID      `gorm:"type:uuid;not null;uniqueIndex:udx_dentist_clinic,priority:2"`
     WorkingDays         pq.StringArray `gorm:"type:text[]"`
     StartTime           string         // "08:00"
     EndTime             string         // "17:00"
@@ -271,25 +378,22 @@ type DentistClinic struct {
     CreatedAt           time.Time
     UpdatedAt           time.Time
 }
-// Unique constraint: (tenant_id, dentist_id, clinic_id)
+// Unique constraint em banco: (dentist_id, clinic_id)
 ```
 
 ### dentist_blocks
-Bloqueios pontuais da agenda do dentista (fora do padrão).
 
 ```go
 type DentistBlock struct {
-    ID        uuid.UUID  `gorm:"type:uuid;primaryKey"`
-    TenantID  uuid.UUID  `gorm:"type:uuid;not null;index"`
-    DentistID uuid.UUID  `gorm:"type:uuid;not null"`
-    // ClinicID nil = bloqueia em todas as clínicas do dentista
-    ClinicID  *uuid.UUID `gorm:"type:uuid"`
-    BlockedDate time.Time `gorm:"type:date;not null"`
-    // StartTime/EndTime nil = bloqueia o dia inteiro
-    StartTime *string
-    EndTime   *string
-    Reason    string
-    CreatedAt time.Time
+    ID          uuid.UUID  `gorm:"type:uuid;primaryKey"`
+    TenantID    uuid.UUID  `gorm:"type:uuid;not null;index"`
+    DentistID   uuid.UUID  `gorm:"type:uuid;not null;index"`
+    ClinicID    *uuid.UUID `gorm:"type:uuid"`        // nil = bloqueia em todas as clínicas
+    BlockedDate time.Time  `gorm:"type:date;not null"`
+    StartTime   *string                               // nil = dia inteiro
+    EndTime     *string
+    Reason      string
+    CreatedAt   time.Time
 }
 ```
 
@@ -303,14 +407,16 @@ type Appointment struct {
     DentistID   uuid.UUID  `gorm:"type:uuid;not null"`
     ClinicID    uuid.UUID  `gorm:"type:uuid;not null"`
     SecretaryID *uuid.UUID `gorm:"type:uuid"`
-    ScheduledAt time.Time
+    ScheduledAt time.Time  `gorm:"not null"`
     CanceledAt  *time.Time
-    Status      string     // scheduled | completed | cancelled
+    Status      string     `gorm:"not null;default:scheduled"` // scheduled | completed | cancelled
     Notes       string
     CreatedAt   time.Time
     UpdatedAt   time.Time
 }
 ```
+
+**Constantes:** `StatusScheduled`, `StatusCompleted`, `StatusCancelled`.
 
 **Regra de agendamento:** antes de criar um `Appointment`, verificar:
 1. O par `(dentist_id, clinic_id)` existe e está ativo em `dentist_clinics`.
@@ -324,8 +430,8 @@ type Consultation struct {
     ID            uuid.UUID `gorm:"type:uuid;primaryKey"`
     TenantID      uuid.UUID `gorm:"type:uuid;not null;index"`
     AppointmentID uuid.UUID `gorm:"type:uuid;not null"`
-    PatientID     uuid.UUID `gorm:"type:uuid;not null"`
-    DentistID     uuid.UUID `gorm:"type:uuid;not null"`
+    PatientID     uuid.UUID `gorm:"type:uuid;not null;index"`
+    DentistID     uuid.UUID `gorm:"type:uuid;not null;index"`
     Diagnosis     string
     Treatment     string
     CreatedAt     time.Time
@@ -334,9 +440,31 @@ type Consultation struct {
 
 ---
 
+## Migrations
+
+Arquivos `.sql` em `internal/infra/db/migrations/`, embutidos via `//go:embed` e executados em ordem lexicográfica (000 → 007) na inicialização.
+
+```go
+//go:embed migrations/*.sql
+var migrationsFS embed.FS
+```
+
+Cada arquivo usa `CREATE TABLE IF NOT EXISTS` — idempotente, seguro para re-executar.
+
+---
+
 ## Cache Redis
 
 ```go
+// Interface em internal/infra/cache/cache.go
+type Cache interface {
+    Get(ctx context.Context, key string) (string, error)
+    Set(ctx context.Context, key, value string, ttl time.Duration) error
+    Del(ctx context.Context, keys ...string) error
+    Incr(ctx context.Context, key string) (int64, error)
+    Expire(ctx context.Context, key string, ttl time.Duration) error
+}
+
 // Padrão de chave: {tenant_id}:{entidade}:{id}
 key := fmt.Sprintf("%s:user:%s", tenantID, userID)
 
@@ -346,6 +474,8 @@ key := fmt.Sprintf("%s:user:%s", tenantID, userID)
 // - agendamentos do dia: 2min
 // - disponibilidade:    1min
 ```
+
+Nunca importar `redis` diretamente fora de `internal/infra/cache/`. Fallback `Noop` é ativado quando Redis está indisponível.
 
 Sempre invalidar cache no `Update` e `Delete`.
 
@@ -392,11 +522,13 @@ func (h *Handler) CreateAppointment(w http.ResponseWriter, r *http.Request) {
 make swagger   # swag init -g cmd/api/main.go -o docs
 ```
 
+UI disponível em `/swagger/` apenas em ambientes não-produção. CSP é relaxado automaticamente para essa rota.
+
 ---
 
 ## Variáveis de Ambiente
 
-Carregadas de `.env` via `godotenv.Load()` no início de `main.go`.
+Carregadas de `.env` via `godotenv.Load()` com fallback silencioso (`_ = godotenv.Load()`).
 Versionar apenas `.env.example`; nunca versionar `.env`.
 
 ```env
@@ -415,9 +547,12 @@ REDIS_ADDR=localhost:6379
 REDIS_PASSWORD=
 REDIS_DB=0
 
-JWT_ISSUER=https://accounts.google.com
-JWT_JWKS_URL=https://www.googleapis.com/oauth2/v3/certs
-JWT_SECRET=sua-chave-privada-rs256
+JWT_SECRET=chave-hmac-secreta   # HMAC HS256 — obrigatório, falha na inicialização se vazio
+JWT_ISSUER=
+JWT_JWKS_URL=
+
+CORS_ALLOWED_ORIGINS=https://app.mirandaclin.com.br,https://admin.mirandaclin.com.br
+RATE_LIMIT_ENABLED=true
 ```
 
 ---
@@ -458,13 +593,6 @@ Em ECS, **não usar arquivo `.env`** — as variáveis são injetadas via:
 - **AWS Secrets Manager** — segredos (`DB_PASS`, `JWT_SECRET`, etc.)
 - **ECS Task Definition environment** — variáveis não-sensíveis (`APP_PORT`, `APP_ENV`, etc.)
 
-O `godotenv.Load()` deve ser chamado com fallback silencioso (sem erro se `.env` não existir), pois em ECS o arquivo não estará presente:
-
-```go
-// main.go
-_ = godotenv.Load() // ignora erro — em ECS as vars vêm do ambiente
-```
-
 ### Infraestrutura esperada
 | Recurso            | Descrição                                      |
 |--------------------|------------------------------------------------|
@@ -474,63 +602,54 @@ _ = godotenv.Load() // ignora erro — em ECS as vars vêm do ambiente
 | Amazon ElastiCache | Redis gerenciado                               |
 | AWS Secrets Manager| Segredos injetados na Task Definition          |
 
+### Dockerfile — multi-stage build
+```
+Stage 1 (builder): golang:1.26-alpine — compila binário + gera docs Swagger (apenas não-prod)
+Stage 2 (runtime): alpine:3.21        — copia só o binário (~10 MB final)
+```
+
+`ARG APP_ENV` é declarado após `go mod download` para aproveitar cache do Docker.
+
 ---
 
 ## Segurança
 
 ### Rate Limiting
 
-Implementado como middleware em `internal/middleware/rate_limit.go` usando Redis como backend de contagem.
-
-**Estratégia:** sliding window por IP + por usuário autenticado (quando JWT válido presente).
+Middleware em `internal/middleware/rate_limit.go` — sliding window **por IP** usando Redis (ou Noop em fallback).
 
 ```go
-// Chave por IP (pré-autenticação)
-key := fmt.Sprintf("rl:ip:%s", clientIP)
-
-// Chave por usuário autenticado (pós-autenticação)
-key := fmt.Sprintf("rl:user:%s:%s", tenantID, userID)
+key := fmt.Sprintf("rl:ip:%s:%s", ip, r.URL.Path)
 ```
 
-**Limites por rota:**
+**Limites por grupo:**
 
-| Grupo                        | Limite          | Janela |
-|------------------------------|-----------------|--------|
-| `POST /v1/api/auth/*`        | 10 requisições  | 1 min  |
-| `POST /v1/api/users`         | 5 requisições   | 1 min  |
-| Rotas autenticadas (geral)   | 120 requisições | 1 min  |
-| Relatórios / consultas       | 30 requisições  | 1 min  |
+| Grupo                                        | Limite          | Janela |
+|----------------------------------------------|-----------------|--------|
+| `POST /v1/api/auth/login`                    | 10 requisições  | 1 min  |
+| Rotas autenticadas (geral)                   | 120 requisições | 1 min  |
+| Relatórios (`/consultations/*`)              | 30 requisições  | 1 min  |
 
-Quando o limite é atingido, retornar `429 Too Many Requests` com header `Retry-After`.
-
-```go
-// Resposta ao exceder limite
-w.Header().Set("Retry-After", "60")
-response.Error(w, http.StatusTooManyRequests, "muitas requisições, tente novamente em instantes")
-```
+Resposta ao exceder limite: `429 Too Many Requests` com header `Retry-After`.
 
 ---
 
 ### Security Headers
 
-Middleware em `internal/middleware/security_headers.go` — aplicado globalmente antes de qualquer handler.
+Middleware em `internal/middleware/security_headers.go` — aceita `env string` para condicionar HSTS.
 
 ```go
-func SecurityHeaders(next http.Handler) http.Handler {
-    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        w.Header().Set("X-Content-Type-Options", "nosniff")
-        w.Header().Set("X-Frame-Options", "DENY")
-        w.Header().Set("X-XSS-Protection", "0") // browsers modernos usam CSP
-        w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
-        w.Header().Set("Content-Security-Policy", "default-src 'none'")
-        w.Header().Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
-        w.Header().Set("Permissions-Policy", "geolocation=(), camera=(), microphone=()")
-        next.ServeHTTP(w, r)
-    })
-}
+SecurityHeaders(cfg.AppEnv) // HSTS omitido em "development"
 ```
 
-`Strict-Transport-Security` só é enviado em `APP_ENV=production` — em desenvolvimento pode causar problemas com HTTP local.
+Headers aplicados em todas as rotas:
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `X-XSS-Protection: 0`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Permissions-Policy: geolocation=(), camera=(), microphone=()`
+- `Content-Security-Policy: default-src 'none'` (relaxado em `/swagger/` para inline scripts/styles)
+- `Strict-Transport-Security` — apenas fora de `development`
 
 ---
 
@@ -538,41 +657,27 @@ func SecurityHeaders(next http.Handler) http.Handler {
 
 Middleware em `internal/middleware/cors.go`.
 
-- Origens permitidas configuradas via variável `CORS_ALLOWED_ORIGINS` (lista separada por vírgula).
-- Em `production`, nunca usar `*` — rejeitar origens não listadas com `403`.
-- Métodos permitidos: `GET, POST, PUT, PATCH, DELETE, OPTIONS`.
-- Headers permitidos: `Authorization, Content-Type`.
-- `Access-Control-Allow-Credentials: true` apenas se a origem for explicitamente permitida.
-
-```env
-CORS_ALLOWED_ORIGINS=https://app.mirandaclin.com.br,https://admin.mirandaclin.com.br
-```
+- Origens configuradas via `CORS_ALLOWED_ORIGINS` (lista separada por vírgula).
+- Origens não listadas não recebem headers CORS — sem `403` explícito, browser bloqueia.
+- `Access-Control-Allow-Credentials: true` apenas para origens permitidas.
+- Preflight OPTIONS retorna `204 No Content`.
 
 ---
 
 ### Proteções Adicionais
 
-**Sanitização de input:**
 - Rejeitar payloads com `Content-Type` diferente de `application/json` nos endpoints que esperam JSON.
 - Limitar tamanho do body: `http.MaxBytesReader(w, r.Body, 1<<20)` (1 MB).
 
 **Logs de segurança — registrar sempre:**
-- Tentativas de login com falha (sem expor motivo detalhado ao cliente).
-- Tokens JWT inválidos ou expirados (IP + timestamp).
+- Tentativas de login com senha inválida (sem expor motivo ao cliente).
+- Tokens JWT inválidos ou expirados.
 - Requisições bloqueadas por rate limit.
-- Acessos negados por `tenant_id` divergente.
 
 **Nunca registrar em log:**
 - Senhas, hashes ou salts.
 - Tokens JWT completos.
 - Dados sensíveis de pacientes (CPF, dados clínicos).
-
-**Variáveis de ambiente adicionais:**
-
-```env
-CORS_ALLOWED_ORIGINS=https://app.mirandaclin.com.br
-RATE_LIMIT_ENABLED=true
-```
 
 ---
 
@@ -580,10 +685,9 @@ RATE_LIMIT_ENABLED=true
 
 ### Interface desacoplada
 
-Nenhum pacote interno importa `zap` diretamente — todos dependem da interface `Logger` definida em `pkg/logger/logger.go`. Isso permite trocar a implementação em testes sem alterar código de produção.
+Nenhum pacote interno importa `zap` diretamente — todos dependem da interface `Logger` em `pkg/logger/logger.go`.
 
 ```go
-// pkg/logger/logger.go
 type Logger interface {
     Info(msg string, fields ...Field)
     Warn(msg string, fields ...Field)
@@ -596,75 +700,39 @@ type Logger interface {
 type Field = zap.Field // reexporta para não vazar zap nos importadores
 ```
 
-A implementação concreta fica em `pkg/logger/zap.go` e é instanciada uma vez em `main.go`:
+Implementação concreta em `pkg/logger/zap.go`, instanciada em `main.go`:
 
 ```go
-// main.go
-log := logger.New(cfg.AppEnv) // "development" → console; qualquer outro → JSON
+log := logger.New(cfg.AppEnv)
 defer log.Sync()
 ```
 
-Serviços, repositórios e handlers recebem `logger.Logger` via injeção de dependência — nunca via variável global.
-
----
+`logger.FromContext(ctx)` retorna o logger injetado no contexto ou um `Noop` se ausente.
 
 ### Configuração por ambiente
 
-| `APP_ENV`     | Formato     | Nível padrão | Saída   |
-|---------------|-------------|--------------|---------|
-| `development` | Console colorido (human-readable) | `debug` | stdout |
-| `stage`       | JSON estruturado | `info`  | stdout |
-| `production`  | JSON estruturado | `info`  | stdout |
-
-Em produção o ECS/CloudWatch coleta o stdout como JSON — não usar arquivos de log.
-
-```go
-// pkg/logger/zap.go
-func New(env string) Logger {
-    if env == "development" {
-        z, _ := zap.NewDevelopment()
-        return &zapLogger{z}
-    }
-    z, _ := zap.NewProduction()
-    return &zapLogger{z}
-}
-```
-
----
+| `APP_ENV`     | Formato                          | Nível padrão |
+|---------------|----------------------------------|--------------|
+| `development` | Console colorido (human-readable) | `debug`     |
+| `stage`       | JSON estruturado                 | `info`       |
+| `production`  | JSON estruturado                 | `info`       |
 
 ### Campos obrigatórios por camada
 
-Todo log deve incluir os campos de contexto relevantes:
-
 ```go
-// Middleware de request — injeta no ctx e loga entrada
-log.Info("request",
-    zap.String("method", r.Method),
-    zap.String("path", r.URL.Path),
-    zap.String("request_id", requestID),
-    zap.String("tenant_id", tenantID.String()),
-    zap.String("ip", clientIP),
-)
-
-// Service / Repository — loga erros com contexto
+// Service / Repository
 log.Error("falha ao criar usuário",
     zap.String("tenant_id", tenantID.String()),
     zap.Error(err),
 )
+
+// Login inválido
+log.Warn("tentativa de login com senha inválida",
+    zap.String("tenant_id", tenantID.String()),
+)
 ```
 
-**`request_id`** gerado no middleware de entrada (UUID v4), propagado via `context.Context` e retornado no header `X-Request-ID`.
-
----
-
-### Estrutura de pastas — Logger
-
-```
-pkg/
-└── logger/
-    ├── logger.go     # interface Logger + tipo Field
-    └── zap.go        # implementação concreta com zap
-```
+`request_id` gerado pelo middleware `RequestID`, propagado via contexto e retornado em `X-Request-ID`.
 
 ---
 
@@ -672,7 +740,7 @@ pkg/
 
 ### Métricas — `/metrics` (Prometheus)
 
-Expor endpoint `/metrics` com métricas no formato Prometheus usando `prometheus/client_golang`.
+Endpoint sem autenticação — proteger por Security Group na AWS (acesso apenas interno/VPC).
 
 Métricas obrigatórias:
 
@@ -684,59 +752,26 @@ Métricas obrigatórias:
 | `cache_hits_total`                   | Counter   | `operation` (`hit`/`miss`)      |
 | `rate_limit_blocked_total`           | Counter   | `route`                         |
 
-O endpoint `/metrics` **não** passa pelos middlewares de autenticação e rate limit, mas deve ser bloqueado por Security Group na AWS (acesso apenas interno/VPC).
-
-```go
-// main.go — rota fora do grupo autenticado
-mux.Handle("/metrics", promhttp.Handler())
-```
-
----
-
 ### Health checks
 
 ```
-GET /health        → liveness  (app está de pé)
-GET /health/ready  → readiness (DB + Redis acessíveis)
+GET /health        → liveness  (app está de pé) → 200
+GET /health/ready  → readiness (DB + Redis acessíveis) → 200 ou 503
 ```
 
 ```json
-// /health/ready — resposta de sucesso
-{
-  "status": "ok",
-  "checks": {
-    "database": "ok",
-    "cache": "ok"
-  }
-}
+// /health/ready — sucesso
+{ "status": "ok", "checks": { "database": "ok", "cache": "ok" } }
+
+// /health/ready — degradado
+{ "status": "degraded", "checks": { "database": "unavailable", "cache": "ok" } }
 ```
 
-Retorna `503` se qualquer dependência estiver indisponível. Usado pelo ECS como `healthCheck` na Task Definition.
-
----
+Readiness usa timeout de 3s para ping do DB e escrita no cache.
 
 ### Request ID
 
-Middleware `internal/middleware/request_id.go`:
-- Gera UUID v4 por requisição.
-- Injeta no `context.Context`.
-- Devolve no header de resposta `X-Request-ID`.
-- Todos os logs da requisição carregam esse ID para rastreabilidade.
-
----
-
-### Estrutura de pastas — Observabilidade
-
-```
-internal/
-└── middleware/
-    ├── request_id.go     # gera e propaga X-Request-ID
-    └── metrics.go        # middleware Prometheus por rota
-pkg/
-└── logger/
-    ├── logger.go
-    └── zap.go
-```
+`internal/middleware/request_id.go` — gera UUID v4, injeta no contexto, retorna em `X-Request-ID`.
 
 ---
 
@@ -745,7 +780,8 @@ pkg/
 - Nunca expor stack traces ou erros internos ao cliente — logar server-side, retornar mensagem genérica.
 - Todo acesso ao banco **deve** filtrar por `tenant_id`.
 - Senhas e salts nunca em log, nunca em response.
-- `DB_SSLMODE=disable` proibido em `production` (validar em `LoadConfig`).
+- `DB_SSLMODE=disable` proibido em `production` (validado em `config.Load()`).
+- `JWT_SECRET` obrigatório — `config.Load()` falha se vazio.
 - Repositórios recebem `*gorm.DB` para suportar transações — nunca usar `r.db` diretamente em operações transacionais.
 - Tabelas relacionais criadas em transação única (ex: `users` + `profiles`).
 - Sem `panic` em handlers — usar retorno de erro + response de erro.
@@ -755,3 +791,5 @@ pkg/
 - Todo log de erro deve incluir `zap.Error(err)` e o `tenant_id` quando disponível no contexto.
 - Nunca logar senhas, hashes, salts, tokens JWT completos ou dados clínicos de pacientes.
 - `X-Request-ID` gerado em toda requisição e propagado nos logs.
+- Migrations em arquivos `.sql` separados em `internal/infra/db/migrations/` — nunca SQL inline em Go.
+- Swagger via `swaggo/swag` + `swaggo/http-swagger/v2` — nunca `go-swagger` ou outra lib.
