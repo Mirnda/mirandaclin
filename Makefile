@@ -6,11 +6,19 @@ SWAG_BIN=$(GOPATH)/bin/swag
 BINARY=bin/mirandaclin
 MAIN=./cmd/api
 
-.PHONY: build test lint swagger clean up down
+.PHONY: up down clean test lint swagger build lint_doc test_doc
 
-build:
-	@echo "Building $(BINARY_NAME)..."
-	go build -o $(BINARY) $(MAIN)
+up:
+	@echo "Iniciando containers..."
+	docker compose up --build -d
+
+down:
+	@echo "Encerrando containers..."
+	docker compose down
+
+clean:
+	@echo "Cleaning up..."
+	rm -rf bin/ docs/
 
 test:
 	@echo "Running tests..."
@@ -29,14 +37,23 @@ else
 	@echo "Swagger skipped: production environment..."
 endif
 
-up:
-	make swagger
-	docker compose up --build -d
+build:
+	@echo "Building $(BINARY_NAME)..."
+	go build -o $(BINARY) $(MAIN)
 
-down:
-	@echo "Encerrando containers..."
-	docker compose down
+# DOCKER MAKES - For those who do not have Go or GolangCI installed.
+GO_IMAGE=golang:1.26-alpine
 
-clean:
-	@echo "Cleaning up..."
-	rm -rf bin/ docs/
+lint_doc:
+	docker run --rm \
+		-v $(CURDIR):/app \
+		-w /app \
+		golangci/golangci-lint:latest \
+		golangci-lint run
+
+test_doc:
+	docker run --rm \
+		-v $(CURDIR):/app \
+		-w /app \
+		$(GO_IMAGE) \
+		go test -v ./...

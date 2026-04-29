@@ -2,7 +2,10 @@ version: "3.9"
 
 services:
   api:
-    build: .
+    build:
+      context: .
+      args:
+        APP_ENV: ${APP_ENV:-development}
     env_file:
       - .env
     ports:
