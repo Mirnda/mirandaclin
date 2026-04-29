@@ -57,7 +57,7 @@ func Migrate(db *gorm.DB) error {
 		if entry.IsDir() {
 			continue
 		}
-		fmt.Printf(" entrey: %v \n", entry.Name())
+
 		content, err := migrationsFS.ReadFile("migrations/" + entry.Name())
 		if err != nil {
 			return fmt.Errorf("lendo %s: %w", entry.Name(), err)

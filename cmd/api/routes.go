@@ -13,6 +13,8 @@ import (
 	"github.com/Mirnda/mirandaclin/internal/middleware"
 	"github.com/Mirnda/mirandaclin/pkg/config"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	_ "github.com/Mirnda/mirandaclin/docs"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
@@ -37,7 +39,9 @@ func registerRoutes(mux *http.ServeMux, h handlers, cfg *config.Config, c cache.
 
 	// Swagger — disponível apenas fora de produção
 	if cfg.AppEnv != "production" {
-		mux.Handle("GET /swagger/", httpSwagger.Handler())
+		mux.Handle("GET /swagger/", httpSwagger.Handler(
+			httpSwagger.URL("/swagger/doc.json"),
+		))
 	}
 
 	// Observabilidade — sem autenticação (proteger por Security Group na AWS)
