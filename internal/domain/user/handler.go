@@ -76,9 +76,8 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		h.svc.log.Error("erro ao criar usuário",
+		logger.FromContext(r.Context()).Error("erro ao criar usuário",
 			logger.String("tenant_id", tenantID.String()),
-			logger.String("request_id", middleware.RequestIDFromContext(r.Context())),
 			logger.Err(err),
 		)
 		response.Error(w, http.StatusInternalServerError, "erro interno")
@@ -96,7 +95,9 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 // @Failure     401 {object} response.Response
 // @Router      /v1/api/auth/login [post]
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
-	h.svc.log.Debug("init h Login")
+	var ctx = r.Context()
+	var log = logger.FromContext(ctx)
+
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -107,28 +108,23 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusBadRequest, "dados inválidos")
 		return
 	}
-	h.svc.log.Debug("pass validate")
 
-	tenantID := middleware.TenantFromContext(r.Context())
-	token, err := h.svc.Login(r.Context(), LoginRequest{
+	tenantID := middleware.TenantFromContext(ctx)
+	token, err := h.svc.Login(ctx, LoginRequest{
 		TenantID: tenantID,
 		Email:    req.Email,
 		Password: req.Password,
 	})
 	if errors.Is(err, ErrInvalidCreds) {
+		log.Error("credenciais inválidas", logger.Err(err))
 		response.Error(w, http.StatusUnauthorized, "credenciais inválidas")
 		return
 	}
 	if err != nil {
-		h.svc.log.Error("erro ao autenticar usuário",
-			logger.String("request_id", middleware.RequestIDFromContext(r.Context())),
-			logger.Err(err),
-		)
+		log.Error("erro ao autenticar usuário", logger.Err(err))
 		response.Error(w, http.StatusInternalServerError, "erro interno")
 		return
 	}
-
-	h.svc.log.Debug("sucesso")
 	response.OK(w, "autenticado com sucesso", map[string]string{"token": token})
 }
 
@@ -153,9 +149,8 @@ func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		h.svc.log.Error("erro ao buscar usuário",
+		logger.FromContext(r.Context()).Error("erro ao buscar usuário",
 			logger.String("tenant_id", tenantID.String()),
-			logger.String("request_id", middleware.RequestIDFromContext(r.Context())),
 			logger.String("user_id", id.String()),
 			logger.Err(err),
 		)

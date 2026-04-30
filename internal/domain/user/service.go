@@ -12,7 +12,6 @@ import (
 	"github.com/Mirnda/mirandaclin/pkg/logger"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -48,11 +47,10 @@ type Service struct {
 	profileRepo profile.Repository
 	cache       cache.Cache
 	jwtSecret   string
-	log         logger.Logger
 }
 
-func NewService(db *gorm.DB, ur Repository, pr profile.Repository, c cache.Cache, secret string, log logger.Logger) *Service {
-	return &Service{db: db, userRepo: ur, profileRepo: pr, cache: c, jwtSecret: secret, log: log}
+func NewService(db *gorm.DB, ur Repository, pr profile.Repository, c cache.Cache, secret string) *Service {
+	return &Service{db: db, userRepo: ur, profileRepo: pr, cache: c, jwtSecret: secret}
 }
 
 func (s *Service) Create(ctx context.Context, req CreateRequest) (*User, error) {
@@ -87,6 +85,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (*User, error) 
 		Document: req.Document,
 	}
 
+	var log = logger.FromContext(ctx)
 	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := s.userRepo.Create(ctx, tx, u); err != nil {
 			return err
@@ -95,15 +94,16 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (*User, error) 
 		return s.profileRepo.Create(ctx, tx, p)
 	})
 	if err != nil {
-		s.log.Error("erro ao criar usuário", zap.String("tenant_id", req.TenantID.String()), zap.Error(err))
+		log.Error("erro ao criar usuário", logger.String("tenant_id", req.TenantID.String()), logger.Err(err))
 		return nil, err
 	}
 
-	s.log.Info("usuário criado", zap.String("tenant_id", req.TenantID.String()), zap.String("user_id", u.ID.String()))
+	log.Info("usuário criado", logger.String("tenant_id", req.TenantID.String()), logger.String("user_id", u.ID.String()))
 	return u, nil
 }
 
 func (s *Service) Login(ctx context.Context, req LoginRequest) (string, error) {
+	var log = logger.FromContext(ctx)
 	u, err := s.userRepo.FindByEmail(ctx, s.db, req.TenantID, req.Email)
 	if err != nil {
 		return "", err
@@ -112,7 +112,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (string, error) {
 		return "", ErrInvalidCreds
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(req.Password+u.Salt)); err != nil {
-		s.log.Warn("tentativa de login com senha inválida", zap.String("tenant_id", req.TenantID.String()))
+		log.Warn("tentativa de login com senha inválida", logger.String("tenant_id", req.TenantID.String()))
 		return "", ErrInvalidCreds
 	}
 

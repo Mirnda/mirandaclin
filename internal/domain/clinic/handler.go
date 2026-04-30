@@ -40,6 +40,9 @@ type createClinicRequest struct {
 // @Success     201 {object} response.Response{data=Clinic}
 // @Router      /v1/api/clinics [post]
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
+	var ctx = r.Context()
+	var log = logger.FromContext(ctx)
+
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	var req createClinicRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -51,7 +54,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tenantID := middleware.TenantFromContext(r.Context())
+	tenantID := middleware.TenantFromContext(ctx)
 	c := &Clinic{
 		TenantID:      tenantID,
 		Name:          req.Name,
@@ -61,10 +64,9 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		OpenTime:      req.OpenTime,
 		CloseTime:     req.CloseTime,
 	}
-	if err := h.svc.Create(r.Context(), c); err != nil {
-		h.svc.log.Error("erro ao criar clínica",
+	if err := h.svc.Create(ctx, c); err != nil {
+		log.Error("erro ao criar clínica",
 			logger.String("tenant_id", tenantID.String()),
-			logger.String("request_id", middleware.RequestIDFromContext(r.Context())),
 			logger.Err(err),
 		)
 		response.Error(w, http.StatusInternalServerError, "erro interno")
@@ -80,12 +82,14 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 // @Success     200 {object} response.Response{data=[]Clinic}
 // @Router      /v1/api/clinics [get]
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
-	tenantID := middleware.TenantFromContext(r.Context())
-	items, err := h.svc.List(r.Context(), tenantID)
+	var ctx = r.Context()
+	var log = logger.FromContext(ctx)
+
+	tenantID := middleware.TenantFromContext(ctx)
+	items, err := h.svc.List(ctx, tenantID)
 	if err != nil {
-		h.svc.log.Error("erro ao listar clínicas",
+		log.Error("erro ao listar clínicas",
 			logger.String("tenant_id", tenantID.String()),
-			logger.String("request_id", middleware.RequestIDFromContext(r.Context())),
 			logger.Err(err),
 		)
 		response.Error(w, http.StatusInternalServerError, "erro interno")
@@ -103,21 +107,23 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 // @Failure     404 {object} response.Response
 // @Router      /v1/api/clinics/{id} [get]
 func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
+	var ctx = r.Context()
+	var log = logger.FromContext(ctx)
+
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		response.Error(w, http.StatusBadRequest, "id inválido")
 		return
 	}
-	tenantID := middleware.TenantFromContext(r.Context())
-	c, err := h.svc.GetByID(r.Context(), tenantID, id)
+	tenantID := middleware.TenantFromContext(ctx)
+	c, err := h.svc.GetByID(ctx, tenantID, id)
 	if errors.Is(err, ErrClinicNotFound) {
 		response.Error(w, http.StatusNotFound, "clínica não encontrada")
 		return
 	}
 	if err != nil {
-		h.svc.log.Error("erro ao buscar clínica",
+		log.Error("erro ao buscar clínica",
 			logger.String("tenant_id", tenantID.String()),
-			logger.String("request_id", middleware.RequestIDFromContext(r.Context())),
 			logger.String("clinic_id", id.String()),
 			logger.Err(err),
 		)
@@ -135,16 +141,18 @@ func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 // @Success     200 {object} response.Response
 // @Router      /v1/api/clinics/{id} [delete]
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
+	var ctx = r.Context()
+	var log = logger.FromContext(ctx)
+
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		response.Error(w, http.StatusBadRequest, "id inválido")
 		return
 	}
-	tenantID := middleware.TenantFromContext(r.Context())
-	if err := h.svc.Delete(r.Context(), tenantID, id); err != nil {
-		h.svc.log.Error("erro ao remover clínica",
+	tenantID := middleware.TenantFromContext(ctx)
+	if err := h.svc.Delete(ctx, tenantID, id); err != nil {
+		log.Error("erro ao remover clínica",
 			logger.String("tenant_id", tenantID.String()),
-			logger.String("request_id", middleware.RequestIDFromContext(r.Context())),
 			logger.String("clinic_id", id.String()),
 			logger.Err(err),
 		)

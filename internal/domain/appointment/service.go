@@ -10,7 +10,6 @@ import (
 	dentistclinic "github.com/Mirnda/mirandaclin/internal/domain/dentist_clinic"
 	"github.com/Mirnda/mirandaclin/pkg/logger"
 	"github.com/google/uuid"
-	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -36,11 +35,10 @@ type Service struct {
 	appointmentRepo Repository
 	dcRepo          dentistclinic.Repository
 	blockRepo       dentistblock.Repository
-	log             logger.Logger
 }
 
-func NewService(db *gorm.DB, ar Repository, dcr dentistclinic.Repository, br dentistblock.Repository, log logger.Logger) *Service {
-	return &Service{db: db, appointmentRepo: ar, dcRepo: dcr, blockRepo: br, log: log}
+func NewService(db *gorm.DB, ar Repository, dcr dentistclinic.Repository, br dentistblock.Repository) *Service {
+	return &Service{db: db, appointmentRepo: ar, dcRepo: dcr, blockRepo: br}
 }
 
 func (s *Service) Create(ctx context.Context, req CreateRequest) (*Appointment, error) {
@@ -79,7 +77,10 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (*Appointment, 
 		Status:      StatusScheduled,
 	}
 	if err := s.appointmentRepo.Create(ctx, s.db, a); err != nil {
-		s.log.Error("erro ao criar agendamento", zap.String("tenant_id", req.TenantID.String()), zap.Error(err))
+		logger.FromContext(ctx).Error("erro ao criar agendamento",
+			logger.String("tenant_id", req.TenantID.String()),
+			logger.Err(err),
+		)
 		return nil, err
 	}
 	return a, nil

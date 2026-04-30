@@ -61,9 +61,8 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		Treatment:     req.Treatment,
 	})
 	if err != nil {
-		h.svc.log.Error("erro ao registrar consulta",
+		logger.FromContext(r.Context()).Error("erro ao registrar consulta",
 			logger.String("tenant_id", tenantID.String()),
-			logger.String("request_id", middleware.RequestIDFromContext(r.Context())),
 			logger.Err(err),
 		)
 		response.Error(w, http.StatusInternalServerError, "erro interno")
@@ -88,9 +87,8 @@ func (h *Handler) ListByPatient(w http.ResponseWriter, r *http.Request) {
 	tenantID := middleware.TenantFromContext(r.Context())
 	items, err := h.svc.ListByPatient(r.Context(), tenantID, patientID)
 	if err != nil {
-		h.svc.log.Error("erro ao listar consultas do paciente",
+		logger.FromContext(r.Context()).Error("erro ao listar consultas do paciente",
 			logger.String("tenant_id", tenantID.String()),
-			logger.String("request_id", middleware.RequestIDFromContext(r.Context())),
 			logger.String("patient_id", patientID.String()),
 			logger.Err(err),
 		)
@@ -116,9 +114,8 @@ func (h *Handler) ListByDentist(w http.ResponseWriter, r *http.Request) {
 	tenantID := middleware.TenantFromContext(r.Context())
 	items, err := h.svc.ListByDentist(r.Context(), tenantID, dentistID)
 	if err != nil {
-		h.svc.log.Error("erro ao listar consultas do dentista",
+		logger.FromContext(r.Context()).Error("erro ao listar consultas do dentista",
 			logger.String("tenant_id", tenantID.String()),
-			logger.String("request_id", middleware.RequestIDFromContext(r.Context())),
 			logger.String("dentist_id", dentistID.String()),
 			logger.Err(err),
 		)

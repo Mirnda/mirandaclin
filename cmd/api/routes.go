@@ -12,6 +12,7 @@ import (
 	"github.com/Mirnda/mirandaclin/internal/infra/cache"
 	"github.com/Mirnda/mirandaclin/internal/middleware"
 	"github.com/Mirnda/mirandaclin/pkg/config"
+	"github.com/Mirnda/mirandaclin/pkg/logger"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	_ "github.com/Mirnda/mirandaclin/docs"
@@ -27,7 +28,7 @@ type handlers struct {
 }
 
 // registerRoutes registra todas as rotas no mux e retorna o handler com o stack global de middlewares aplicado.
-func registerRoutes(mux *http.ServeMux, h handlers, cfg *config.Config, c cache.Cache) http.Handler {
+func registerRoutes(mux *http.ServeMux, h handlers, cfg *config.Config, c cache.Cache, log logger.Logger) http.Handler {
 	authMw := middleware.Auth(cfg.JWTSecret)
 	authRL := middleware.RateLimit(c, 10, time.Minute)
 	generalRL := middleware.RateLimit(c, 120, time.Minute)
@@ -72,11 +73,13 @@ func registerRoutes(mux *http.ServeMux, h handlers, cfg *config.Config, c cache.
 	mux.Handle("GET /v1/api/consultations/patient/{patient_id}", reportRL(authMw(http.HandlerFunc(h.consultation.ListByPatient))))
 	mux.Handle("GET /v1/api/consultations/dentist/{dentist_id}", reportRL(authMw(http.HandlerFunc(h.consultation.ListByDentist))))
 
-	// Stack global: RequestID → SecurityHeaders → CORS → Metrics → rotas
+	// Stack global: RequestID → RequestLogger → SecurityHeaders → CORS → Metrics → rotas
 	return middleware.RequestID(
-		middleware.SecurityHeaders(cfg.AppEnv)(
-			middleware.CORS(cfg.CORSAllowedOrigins)(
-				middleware.Metrics(mux),
+		middleware.RequestLogger(log)(
+			middleware.SecurityHeaders(cfg.AppEnv)(
+				middleware.CORS(cfg.CORSAllowedOrigins)(
+					middleware.Metrics(mux),
+				),
 			),
 		),
 	)

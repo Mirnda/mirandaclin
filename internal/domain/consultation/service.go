@@ -6,7 +6,6 @@ import (
 
 	"github.com/Mirnda/mirandaclin/pkg/logger"
 	"github.com/google/uuid"
-	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -24,11 +23,10 @@ type CreateRequest struct {
 type Service struct {
 	db   *gorm.DB
 	repo Repository
-	log  logger.Logger
 }
 
-func NewService(db *gorm.DB, r Repository, log logger.Logger) *Service {
-	return &Service{db: db, repo: r, log: log}
+func NewService(db *gorm.DB, r Repository) *Service {
+	return &Service{db: db, repo: r}
 }
 
 func (s *Service) Create(ctx context.Context, req CreateRequest) (*Consultation, error) {
@@ -41,7 +39,10 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (*Consultation,
 		Treatment:     req.Treatment,
 	}
 	if err := s.repo.Create(ctx, s.db, c); err != nil {
-		s.log.Error("erro ao criar consulta", zap.String("tenant_id", req.TenantID.String()), zap.Error(err))
+		logger.FromContext(ctx).Error("erro ao criar consulta",
+			logger.String("tenant_id", req.TenantID.String()),
+			logger.Err(err),
+		)
 		return nil, err
 	}
 	return c, nil

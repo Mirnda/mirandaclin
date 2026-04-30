@@ -6,7 +6,6 @@ import (
 
 	"github.com/Mirnda/mirandaclin/pkg/logger"
 	"github.com/google/uuid"
-	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -15,16 +14,18 @@ var ErrClinicNotFound = errors.New("clínica não encontrada")
 type Service struct {
 	db   *gorm.DB
 	repo Repository
-	log  logger.Logger
 }
 
-func NewService(db *gorm.DB, r Repository, log logger.Logger) *Service {
-	return &Service{db: db, repo: r, log: log}
+func NewService(db *gorm.DB, r Repository) *Service {
+	return &Service{db: db, repo: r}
 }
 
 func (s *Service) Create(ctx context.Context, c *Clinic) error {
 	if err := s.repo.Create(ctx, s.db, c); err != nil {
-		s.log.Error("erro ao criar clínica", zap.String("tenant_id", c.TenantID.String()), zap.Error(err))
+		logger.FromContext(ctx).Error("erro ao criar clínica",
+			logger.String("tenant_id", c.TenantID.String()),
+			logger.Err(err),
+		)
 		return err
 	}
 	return nil

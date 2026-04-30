@@ -24,7 +24,6 @@ import (
 	"github.com/Mirnda/mirandaclin/pkg/config"
 	"github.com/Mirnda/mirandaclin/pkg/logger"
 	"github.com/joho/godotenv"
-	"go.uber.org/zap"
 )
 
 func main() {
@@ -41,18 +40,18 @@ func main() {
 	// Banco de dados
 	db, err := infraDB.New(cfg.DSN())
 	if err != nil {
-		log.Error("falha ao conectar banco", zap.Error(err))
+		log.Error("falha ao conectar banco", logger.Err(err))
 		panic(err)
 	}
 	if err := infraDB.Migrate(db); err != nil {
-		log.Error("falha na migration", zap.Error(err))
+		log.Error("falha na migration", logger.Err(err))
 		panic(err)
 	}
 
 	// Cache
 	cache, err := infraCache.NewRedis(cfg.RedisAddr, cfg.RedisPassword, cfg.RedisDB)
 	if err != nil {
-		log.Warn("Redis indisponível — usando Noop cache", zap.Error(err))
+		log.Warn("Redis indisponível — usando Noop cache", logger.Err(err))
 		cache = infraCache.NewNoop()
 	}
 
@@ -66,10 +65,10 @@ func main() {
 	consultRepo := repository.NewConsultationRepository()
 
 	// Services
-	userSvc := user.NewService(db, userRepo, profileRepo, cache, cfg.JWTSecret, log)
-	clinicSvc := clinic.NewService(db, clinicRepo, log)
-	apptSvc := appointment.NewService(db, apptRepo, dcRepo, blockRepo, log)
-	consultSvc := consultation.NewService(db, consultRepo, log)
+	userSvc := user.NewService(db, userRepo, profileRepo, cache, cfg.JWTSecret)
+	clinicSvc := clinic.NewService(db, clinicRepo)
+	apptSvc := appointment.NewService(db, apptRepo, dcRepo, blockRepo)
+	consultSvc := consultation.NewService(db, consultRepo)
 
 	// Handlers
 	h := handlers{
@@ -81,10 +80,10 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-	handler := registerRoutes(mux, h, cfg, cache)
+	handler := registerRoutes(mux, h, cfg, cache, log)
 
 	addr := ":" + cfg.AppPort
-	log.Info("servidor iniciando", zap.String("addr", addr), zap.String("env", cfg.AppEnv))
+	log.Info("servidor iniciando", logger.String("addr", addr), logger.String("env", cfg.AppEnv))
 
 	srv := &http.Server{
 		Addr:         addr,
@@ -94,6 +93,6 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 	if err := srv.ListenAndServe(); err != nil {
-		log.Error("servidor encerrado", zap.Error(err))
+		log.Error("servidor encerrado", logger.Err(err))
 	}
 }

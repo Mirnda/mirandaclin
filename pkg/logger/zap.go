@@ -19,9 +19,13 @@ type zapLogger struct {
 func New(env string) Logger {
 	var z *zap.Logger
 	if env == "development" {
-		z, _ = zap.NewDevelopment()
+		z, _ = zap.NewDevelopment(
+			zap.AddCallerSkip(1),
+			// stacktraces as multi-line text break Loki log grouping; caller field is enough for dev
+			zap.AddStacktrace(zap.ErrorLevel),
+		)
 	} else {
-		z, _ = zap.NewProduction()
+		z, _ = zap.NewProduction(zap.AddCallerSkip(1))
 	}
 	return &zapLogger{z: z}
 }
@@ -31,6 +35,10 @@ func FromContext(ctx context.Context) Logger {
 		return l
 	}
 	return &zapLogger{z: zap.NewNop()}
+}
+
+func WithContext(ctx context.Context, l Logger) context.Context {
+	return context.WithValue(ctx, loggerKey, l)
 }
 
 func (l *zapLogger) Info(msg string, fields ...Field)  { l.z.Info(msg, fields...) }
