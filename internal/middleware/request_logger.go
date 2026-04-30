@@ -49,16 +49,31 @@ func RequestLogger(log logger.Logger) func(http.Handler) http.Handler {
 			tracedLog := log.With(logger.String("request_id", requestID))
 			ctx = logger.WithContext(ctx, tracedLog)
 
+			method := r.Method
+			path := r.URL.Path
+			accept := r.Header.Get("Accept")
+			acceptEncoding := r.Header.Get("AcceptEncoding")
+			connection := r.Header.Get("Connection")
+			contentLength := r.Header.Get("Content-Length")
+			contentType := r.Header.Get("Content-Type")
+			userAgent := r.Header.Get("User-Agent")
+
 			r = r.WithContext(ctx)
 			next.ServeHTTP(sw, r)
 
 			logFields := []logger.Field{
-				logger.String("method", r.Method),
-				logger.String("path", r.URL.Path),
+				logger.String("method", method),
+				logger.String("path", path),
 				logger.Int("status", sw.status),
 				logger.Int64("duration_ms", time.Since(start).Milliseconds()),
 				logger.String("request_id", RequestIDFromContext(r.Context())),
 				logger.String("ip", remoteIP(r)),
+				logger.String("accept", accept),
+				logger.String("accept_encoding", acceptEncoding),
+				logger.String("connection", connection),
+				logger.String("content_length", contentLength),
+				logger.String("user_agent", userAgent),
+				logger.String("content_type", contentType),
 			}
 			if fields.userID != "" {
 				logFields = append(logFields, logger.String("user_id", fields.userID))
@@ -66,7 +81,7 @@ func RequestLogger(log logger.Logger) func(http.Handler) http.Handler {
 			if fields.tenantID != "" {
 				logFields = append(logFields, logger.String("tenant_id", fields.tenantID))
 			}
-			log.Info("request", logFields...)
+			log.Debug("request", logFields...)
 		})
 	}
 }

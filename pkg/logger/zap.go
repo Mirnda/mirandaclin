@@ -15,15 +15,19 @@ type zapLogger struct {
 }
 
 // New cria um Logger concreto baseado em zap.
-// Em development usa console colorido com nível debug; demais envs usam JSON com nível info.
+// Todos os envs usam JSON para que o Loki consiga parsear campos estruturados com | json.
+// Development usa nível debug; demais envs usam nível info.
 func New(env string) Logger {
 	var z *zap.Logger
+
 	if env == "development" {
-		z, _ = zap.NewDevelopment(
+		cfg := zap.NewDevelopmentConfig()
+		cfg.Encoding = "json"
+		z, _ = cfg.Build(
 			zap.AddCallerSkip(1),
-			// stacktraces as multi-line text break Loki log grouping; caller field is enough for dev
 			zap.AddStacktrace(zap.ErrorLevel),
 		)
+		z = z.With(String("env", env))
 	} else {
 		z, _ = zap.NewProduction(zap.AddCallerSkip(1))
 	}
