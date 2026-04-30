@@ -45,8 +45,10 @@ func RequestLogger(log logger.Logger) func(http.Handler) http.Handler {
 			fields := &requestLogFields{}
 			ctx := context.WithValue(r.Context(), requestLogKey{}, fields)
 
-			requestID := RequestIDFromContext(r.Context())
+			// requestID := RequestIDFromContext(r.Context())  || TODO REMOVER
+			requestID := logger.GetRequestID(ctx)
 			tracedLog := log.With(logger.String("request_id", requestID))
+
 			ctx = logger.WithContext(ctx, tracedLog)
 
 			method := r.Method
@@ -66,7 +68,7 @@ func RequestLogger(log logger.Logger) func(http.Handler) http.Handler {
 				logger.String("path", path),
 				logger.Int("status", sw.status),
 				logger.Int64("duration_ms", time.Since(start).Milliseconds()),
-				logger.String("request_id", RequestIDFromContext(r.Context())),
+				logger.String("request_id", requestID),
 				logger.String("ip", remoteIP(r)),
 				logger.String("accept", accept),
 				logger.String("accept_encoding", acceptEncoding),

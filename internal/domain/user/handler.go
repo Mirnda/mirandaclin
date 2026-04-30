@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/Mirnda/mirandaclin/internal/domain/invite"
 	"github.com/Mirnda/mirandaclin/internal/middleware"
 	"github.com/Mirnda/mirandaclin/pkg/logger"
 	"github.com/Mirnda/mirandaclin/pkg/response"
@@ -34,6 +35,10 @@ type createUserRequest struct {
 type loginRequest struct {
 	Email    string `json:"email"    validate:"required,email"`
 	Password string `json:"password" validate:"required"`
+}
+
+type acceptInviteRequest struct {
+	Token string `json:"token" validate:"required"`
 }
 
 // @Summary     Criar usuário
@@ -84,6 +89,45 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.Created(w, "usuário criado com sucesso", u)
+}
+
+// @Summary     Aceitar convite e criar conta
+// @Tags        invites
+// @Accept      json
+// @Produce     json
+// @Param       body body acceptInviteRequest true "Token do convite"
+// @Success     201 {object} response.Response{data=map[string]string}
+// @Failure     400 {object} response.Response
+// @Failure     409 {object} response.Response
+// @Failure     422 {object} response.Response
+// @Router      /v1/api/invites/accept [post]
+func (h *Handler) AcceptInvite(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	var req acceptInviteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.Error(w, http.StatusBadRequest, "payload inválido")
+		return
+	}
+	if errs := validator.Validate(req); errs != nil {
+		response.Error(w, http.StatusBadRequest, "dados inválidos")
+		return
+	}
+
+	token, err := h.svc.AcceptInvite(r.Context(), AcceptInviteRequest{Token: req.Token})
+	if errors.Is(err, invite.ErrInvalidInvite) {
+		response.Error(w, http.StatusUnprocessableEntity, "convite inválido ou expirado")
+		return
+	}
+	if errors.Is(err, ErrEmailConflict) {
+		response.Error(w, http.StatusConflict, err.Error())
+		return
+	}
+	if err != nil {
+		logger.FromContext(r.Context()).Error("erro ao aceitar convite", logger.Err(err))
+		response.Error(w, http.StatusInternalServerError, "erro interno")
+		return
+	}
+	response.Created(w, "cadastro realizado com sucesso", map[string]string{"token": token})
 }
 
 // @Summary     Login

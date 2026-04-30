@@ -7,6 +7,7 @@ import (
 	"github.com/Mirnda/mirandaclin/internal/domain/appointment"
 	"github.com/Mirnda/mirandaclin/internal/domain/clinic"
 	"github.com/Mirnda/mirandaclin/internal/domain/consultation"
+	"github.com/Mirnda/mirandaclin/internal/domain/invite"
 	"github.com/Mirnda/mirandaclin/internal/domain/user"
 	"github.com/Mirnda/mirandaclin/internal/health"
 	"github.com/Mirnda/mirandaclin/internal/infra/cache"
@@ -21,6 +22,7 @@ import (
 
 type handlers struct {
 	user         *user.Handler
+	invite       *invite.Handler
 	clinic       *clinic.Handler
 	appointment  *appointment.Handler
 	consultation *consultation.Handler
@@ -30,6 +32,8 @@ type handlers struct {
 // registerRoutes registra todas as rotas no mux e retorna o handler com o stack global de middlewares aplicado.
 func registerRoutes(mux *http.ServeMux, h handlers, cfg *config.Config, c cache.Cache, log logger.Logger) http.Handler {
 	authMw := middleware.Auth(cfg.JWTSecret)
+	apiKeyMw := middleware.APIKey(cfg.APIKey)
+	inviteRL := middleware.RateLimit(c, 5, time.Minute)
 	authRL := middleware.RateLimit(c, 10, time.Minute)
 	generalRL := middleware.RateLimit(c, 120, time.Minute)
 	reportRL := middleware.RateLimit(c, 30, time.Minute)
@@ -50,8 +54,12 @@ func registerRoutes(mux *http.ServeMux, h handlers, cfg *config.Config, c cache.
 	mux.HandleFunc("GET /health", h.health.Liveness)
 	mux.HandleFunc("GET /health/ready", h.health.Readiness)
 
-	// Auth
+	// Auth — rotas públicas
 	mux.Handle("POST /v1/api/auth/login", authRL(http.HandlerFunc(h.user.Login)))
+
+	// Invites
+	mux.Handle("POST /v1/api/invites", inviteRL(apiKeyMw(http.HandlerFunc(h.invite.Create))))
+	mux.Handle("POST /v1/api/invites/accept", authRL(http.HandlerFunc(h.user.AcceptInvite)))
 
 	// Users
 	mux.Handle("POST /v1/api/users", protect(http.HandlerFunc(h.user.Create)))

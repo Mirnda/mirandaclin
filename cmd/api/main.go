@@ -16,6 +16,7 @@ import (
 	"github.com/Mirnda/mirandaclin/internal/domain/appointment"
 	"github.com/Mirnda/mirandaclin/internal/domain/clinic"
 	"github.com/Mirnda/mirandaclin/internal/domain/consultation"
+	"github.com/Mirnda/mirandaclin/internal/domain/invite"
 	"github.com/Mirnda/mirandaclin/internal/domain/user"
 	"github.com/Mirnda/mirandaclin/internal/health"
 	infraCache "github.com/Mirnda/mirandaclin/internal/infra/cache"
@@ -23,6 +24,7 @@ import (
 	"github.com/Mirnda/mirandaclin/internal/infra/repository"
 	"github.com/Mirnda/mirandaclin/pkg/config"
 	"github.com/Mirnda/mirandaclin/pkg/logger"
+	"github.com/Mirnda/mirandaclin/pkg/mailer"
 	"github.com/joho/godotenv"
 )
 
@@ -35,7 +37,7 @@ func main() {
 	}
 
 	log := logger.New(cfg.AppEnv)
-	defer log.Sync()
+	defer func() { _ = log.Sync() }()
 
 	// Banco de dados
 	db, err := infraDB.New(cfg.DSN())
@@ -58,14 +60,24 @@ func main() {
 	// Repositórios
 	userRepo := repository.NewUserRepository()
 	profileRepo := repository.NewProfileRepository()
+	inviteRepo := repository.NewInviteRepository()
 	clinicRepo := repository.NewClinicRepository()
 	dcRepo := repository.NewDentistClinicRepository()
 	blockRepo := repository.NewDentistBlockRepository()
 	apptRepo := repository.NewAppointmentRepository()
 	consultRepo := repository.NewConsultationRepository()
 
+	// Mailer
+	var ml mailer.Mailer
+	if cfg.SMTPHost != "" {
+		ml = mailer.NewSMTP(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPass, cfg.SMTPFrom)
+	} else {
+		ml = mailer.NewNoop()
+	}
+
 	// Services
-	userSvc := user.NewService(db, userRepo, profileRepo, cache, cfg.JWTSecret)
+	userSvc := user.NewService(db, userRepo, profileRepo, inviteRepo, cache, cfg.JWTSecret)
+	inviteSvc := invite.NewService(db, inviteRepo, ml, cfg.AppURL)
 	clinicSvc := clinic.NewService(db, clinicRepo)
 	apptSvc := appointment.NewService(db, apptRepo, dcRepo, blockRepo)
 	consultSvc := consultation.NewService(db, consultRepo)
@@ -73,6 +85,7 @@ func main() {
 	// Handlers
 	h := handlers{
 		user:         user.NewHandler(userSvc),
+		invite:       invite.NewHandler(inviteSvc),
 		clinic:       clinic.NewHandler(clinicSvc),
 		appointment:  appointment.NewHandler(apptSvc),
 		consultation: consultation.NewHandler(consultSvc),

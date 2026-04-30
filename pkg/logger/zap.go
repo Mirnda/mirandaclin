@@ -3,6 +3,7 @@ package logger
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
@@ -43,6 +44,24 @@ func FromContext(ctx context.Context) Logger {
 
 func WithContext(ctx context.Context, l Logger) context.Context {
 	return context.WithValue(ctx, loggerKey, l)
+}
+
+type requestIDKey struct{}
+
+var reqKey = requestIDKey{}
+
+// WithRequestID generate a request ID for each execution
+func WithRequestID(ctx context.Context) context.Context {
+	requestID := uuid.New().String()
+	return context.WithValue(ctx, reqKey, requestID)
+}
+
+// GetRequestID retrieves the request ID of the execution.
+func GetRequestID(ctx context.Context) string {
+	if id, ok := ctx.Value(reqKey).(string); ok {
+		return id
+	}
+	return ""
 }
 
 func (l *zapLogger) Info(msg string, fields ...Field)  { l.z.Info(msg, fields...) }

@@ -26,8 +26,17 @@ type Config struct {
 	JWTIssuer  string
 	JWTJWKSURL string
 
+	APIKey string
+
 	CORSAllowedOrigins string
 	RateLimitEnabled   bool
+
+	SMTPHost string
+	SMTPPort string
+	SMTPUser string
+	SMTPPass string
+	SMTPFrom string
+	AppURL   string
 }
 
 func Load() (*Config, error) {
@@ -54,8 +63,17 @@ func Load() (*Config, error) {
 		JWTIssuer:  env("JWT_ISSUER", ""),
 		JWTJWKSURL: env("JWT_JWKS_URL", ""),
 
+		APIKey: env("API_KEY", ""),
+
 		CORSAllowedOrigins: env("CORS_ALLOWED_ORIGINS", ""),
 		RateLimitEnabled:   rateLimitEnabled,
+
+		SMTPHost: env("SMTP_HOST", ""),
+		SMTPPort: env("SMTP_PORT", "587"),
+		SMTPUser: env("SMTP_USER", ""),
+		SMTPPass: env("SMTP_PASS", ""),
+		SMTPFrom: env("SMTP_FROM", ""),
+		AppURL:   env("APP_URL", "http://localhost:3000"),
 	}
 
 	if cfg.AppEnv == "production" && cfg.DBSSLMode == "disable" {
@@ -63,6 +81,9 @@ func Load() (*Config, error) {
 	}
 	if cfg.JWTSecret == "" {
 		return nil, fmt.Errorf("JWT_SECRET é obrigatório")
+	}
+	if cfg.APIKey == "" {
+		return nil, fmt.Errorf("API_KEY é obrigatório")
 	}
 
 	return cfg, nil
