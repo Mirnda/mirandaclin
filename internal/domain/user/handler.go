@@ -113,7 +113,7 @@ func (h *Handler) AcceptInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.svc.AcceptInvite(r.Context(), AcceptInviteRequest{Token: req.Token})
+	token, err := h.svc.AcceptInvite(r.Context(), AcceptInviteRequest(req))
 	if errors.Is(err, invite.ErrInvalidInvite) {
 		response.Error(w, http.StatusUnprocessableEntity, "convite inválido ou expirado")
 		return
@@ -159,6 +159,8 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		Email:    req.Email,
 		Password: req.Password,
 	})
+
+	log.With(logger.String("req", req.Email)).With(logger.String("tenantID", tenantID.String())).Info("reqqq")
 	if errors.Is(err, ErrInvalidCreds) {
 		log.Error("credenciais inválidas", logger.Err(err))
 		response.Error(w, http.StatusUnauthorized, "credenciais inválidas")

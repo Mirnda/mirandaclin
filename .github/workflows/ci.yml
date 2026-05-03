@@ -56,10 +56,11 @@ jobs:
       DB_SSLMODE: disable
       REDIS_ADDR: localhost:6379
       JWT_SECRET: ci-secret-para-testes
+      API_KEY: ci-api-key-para-testes
       CORS_ALLOWED_ORIGINS: http://localhost:3000
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.26"
       - name: Testes unitários
@@ -72,7 +73,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint, test]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Configure AWS credentials
         if: github.ref == 'refs/heads/main'
         uses: aws-actions/configure-aws-credentials@v4
@@ -102,7 +103,7 @@ jobs:
     needs: build
     if: github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
