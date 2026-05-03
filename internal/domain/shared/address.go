@@ -1,6 +1,6 @@
 package shared
 
-// Address é embutido em Profile e Clinic via GORM embedded com prefixo "address_".
+// Address é embutido em User e Clinic via GORM embedded com prefixo "address_".
 type Address struct {
 	PostalCode   string `json:"postal_code"`
 	Street       string `json:"street"`

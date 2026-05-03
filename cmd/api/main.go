@@ -59,8 +59,9 @@ func main() {
 
 	// Repositórios
 	userRepo := repository.NewUserRepository()
-	profileRepo := repository.NewProfileRepository()
 	inviteRepo := repository.NewInviteRepository()
+	tenantRepo := repository.NewTenantRepository()
+	memberRepo := repository.NewTenantMemberRepository()
 	clinicRepo := repository.NewClinicRepository()
 	dcRepo := repository.NewDentistClinicRepository()
 	blockRepo := repository.NewDentistBlockRepository()
@@ -76,7 +77,7 @@ func main() {
 	}
 
 	// Services
-	userSvc := user.NewService(db, userRepo, profileRepo, inviteRepo, cache, cfg.JWTSecret)
+	userSvc := user.NewService(db, userRepo, inviteRepo, tenantRepo, memberRepo, cache, cfg.JWTSecret)
 	inviteSvc := invite.NewService(db, inviteRepo, ml, cfg.AppURL)
 	clinicSvc := clinic.NewService(db, clinicRepo)
 	apptSvc := appointment.NewService(db, apptRepo, dcRepo, blockRepo)

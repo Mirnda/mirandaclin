@@ -10,6 +10,7 @@ import (
 	"github.com/Mirnda/mirandaclin/pkg/logger"
 	"github.com/Mirnda/mirandaclin/pkg/response"
 	"github.com/Mirnda/mirandaclin/pkg/validator"
+	"github.com/google/uuid"
 )
 
 type Handler struct {
@@ -18,6 +19,18 @@ type Handler struct {
 
 func NewHandler(svc *Service) *Handler {
 	return &Handler{svc: svc}
+}
+
+type registerRequest struct {
+	TenantName            string `json:"tenant_name"             validate:"required"`
+	Email                 string `json:"email"                   validate:"required,email"`
+	Password              string `json:"password"                validate:"required,min=8"`
+	FullName              string `json:"full_name"               validate:"required"`
+	Document              string `json:"document"`
+	Phone                 string `json:"phone"`
+	HasWhatsapp           bool   `json:"has_whatsapp"`
+	EmergencyContactName  string `json:"emergency_contact_name"`
+	EmergencyContactPhone string `json:"emergency_contact_phone"`
 }
 
 type createUserRequest struct {
@@ -33,15 +46,60 @@ type createUserRequest struct {
 }
 
 type loginRequest struct {
-	Email    string `json:"email"    validate:"required,email"`
-	Password string `json:"password" validate:"required"`
+	Email    string    `json:"email"     validate:"required,email"`
+	Password string    `json:"password"  validate:"required"`
+	TenantID uuid.UUID `json:"tenant_id"` // opcional quando pertence a múltiplos tenants
 }
 
 type acceptInviteRequest struct {
 	Token string `json:"token" validate:"required"`
 }
 
-// @Summary     Criar usuário
+// @Summary     Registro de nova clínica (cria tenant + usuário admin)
+// @Tags        auth
+// @Accept      json
+// @Produce     json
+// @Param       body body registerRequest true "Dados do registro"
+// @Success     201 {object} response.Response{data=map[string]string}
+// @Failure     400 {object} response.Response
+// @Failure     409 {object} response.Response
+// @Router      /v1/api/auth/register [post]
+func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	var req registerRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.Error(w, http.StatusBadRequest, "payload inválido")
+		return
+	}
+	if errs := validator.Validate(req); errs != nil {
+		response.Error(w, http.StatusBadRequest, "dados inválidos")
+		return
+	}
+
+	token, err := h.svc.Register(r.Context(), RegisterRequest{
+		TenantName:            req.TenantName,
+		Email:                 req.Email,
+		Password:              req.Password,
+		FullName:              req.FullName,
+		Document:              req.Document,
+		Phone:                 req.Phone,
+		HasWhatsapp:           req.HasWhatsapp,
+		EmergencyContactName:  req.EmergencyContactName,
+		EmergencyContactPhone: req.EmergencyContactPhone,
+	})
+	if errors.Is(err, ErrEmailConflict) {
+		response.Error(w, http.StatusConflict, err.Error())
+		return
+	}
+	if err != nil {
+		logger.FromContext(r.Context()).Error("erro ao registrar clínica", logger.Err(err))
+		response.Error(w, http.StatusInternalServerError, "erro interno")
+		return
+	}
+	response.Created(w, "clínica registrada com sucesso", map[string]string{"token": token})
+}
+
+// @Summary     Criar usuário no tenant
 // @Tags        users
 // @Security    BearerAuth
 // @Accept      json
@@ -137,6 +195,7 @@ func (h *Handler) AcceptInvite(w http.ResponseWriter, r *http.Request) {
 // @Param       body body loginRequest true "Credenciais"
 // @Success     200 {object} response.Response{data=map[string]string}
 // @Failure     401 {object} response.Response
+// @Failure     422 {object} response.Response
 // @Router      /v1/api/auth/login [post]
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	var ctx = r.Context()
@@ -153,17 +212,22 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tenantID := middleware.TenantFromContext(ctx)
 	token, err := h.svc.Login(ctx, LoginRequest{
-		TenantID: tenantID,
 		Email:    req.Email,
 		Password: req.Password,
+		TenantID: req.TenantID,
 	})
-
-	log.With(logger.String("req", req.Email)).With(logger.String("tenantID", tenantID.String())).Info("reqqq")
 	if errors.Is(err, ErrInvalidCreds) {
-		log.Error("credenciais inválidas", logger.Err(err))
+		log.Warn("credenciais inválidas", logger.String("email", req.Email))
 		response.Error(w, http.StatusUnauthorized, "credenciais inválidas")
+		return
+	}
+	if errors.Is(err, ErrTenantRequired) {
+		response.Error(w, http.StatusUnprocessableEntity, ErrTenantRequired.Error())
+		return
+	}
+	if errors.Is(err, ErrTenantForbidden) {
+		response.Error(w, http.StatusForbidden, ErrTenantForbidden.Error())
 		return
 	}
 	if err != nil {
@@ -188,15 +252,13 @@ func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusBadRequest, "id inválido")
 		return
 	}
-	tenantID := middleware.TenantFromContext(r.Context())
-	u, err := h.svc.GetByID(r.Context(), tenantID, id)
+	u, err := h.svc.GetByID(r.Context(), id)
 	if errors.Is(err, ErrUserNotFound) {
 		response.Error(w, http.StatusNotFound, "usuário não encontrado")
 		return
 	}
 	if err != nil {
 		logger.FromContext(r.Context()).Error("erro ao buscar usuário",
-			logger.String("tenant_id", tenantID.String()),
 			logger.String("user_id", id.String()),
 			logger.Err(err),
 		)

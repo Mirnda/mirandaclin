@@ -31,15 +31,23 @@ type handlers struct {
 
 // registerRoutes registra todas as rotas no mux e retorna o handler com o stack global de middlewares aplicado.
 func registerRoutes(mux *http.ServeMux, h handlers, cfg *config.Config, c cache.Cache, log logger.Logger) http.Handler {
-	authMw := middleware.Auth(cfg.JWTSecret)
-	apiKeyMw := middleware.APIKey(cfg.APIKey)
-	inviteRL := middleware.RateLimit(c, 5, time.Minute)
-	authRL := middleware.RateLimit(c, 10, time.Minute)
-	generalRL := middleware.RateLimit(c, 120, time.Minute)
-	reportRL := middleware.RateLimit(c, 30, time.Minute)
+	publicRL := middleware.RateLimit(c, 10, time.Minute)
 
+	authMw := middleware.Auth(cfg.JWTSecret)
+
+	generalRL := middleware.RateLimit(c, 120, time.Minute)
 	protect := func(handler http.Handler) http.Handler {
 		return generalRL(authMw(handler))
+	}
+
+	inviteRL := middleware.RateLimit(c, 5, time.Minute)
+	inviteProtect := func(handler http.Handler) http.Handler {
+		return inviteRL(authMw(handler))
+	}
+
+	reportRL := middleware.RateLimit(c, 30, time.Minute)
+	reportProtect := func(handler http.Handler) http.Handler {
+		return reportRL(authMw(handler))
 	}
 
 	// Swagger — disponível apenas fora de produção
@@ -55,11 +63,12 @@ func registerRoutes(mux *http.ServeMux, h handlers, cfg *config.Config, c cache.
 	mux.HandleFunc("GET /health/ready", h.health.Readiness)
 
 	// Auth — rotas públicas
-	mux.Handle("POST /v1/api/auth/login", authRL(http.HandlerFunc(h.user.Login)))
+	mux.Handle("POST /v1/api/auth/register", publicRL(http.HandlerFunc(h.user.Register)))
+	mux.Handle("POST /v1/api/auth/login", publicRL(http.HandlerFunc(h.user.Login)))
 
 	// Invites
-	mux.Handle("POST /v1/api/invites", inviteRL(apiKeyMw(http.HandlerFunc(h.invite.Create))))
-	mux.Handle("POST /v1/api/invites/accept", authRL(http.HandlerFunc(h.user.AcceptInvite)))
+	mux.Handle("POST /v1/api/invites", inviteProtect(http.HandlerFunc(h.invite.Create)))
+	mux.Handle("POST /v1/api/invites/accept", publicRL(http.HandlerFunc(h.user.AcceptInvite)))
 
 	// Users
 	mux.Handle("POST /v1/api/users", protect(http.HandlerFunc(h.user.Create)))
@@ -78,8 +87,8 @@ func registerRoutes(mux *http.ServeMux, h handlers, cfg *config.Config, c cache.
 
 	// Consultations — rate limit reduzido por ser rota de relatório
 	mux.Handle("POST /v1/api/consultations", protect(http.HandlerFunc(h.consultation.Create)))
-	mux.Handle("GET /v1/api/consultations/patient/{patient_id}", reportRL(authMw(http.HandlerFunc(h.consultation.ListByPatient))))
-	mux.Handle("GET /v1/api/consultations/dentist/{dentist_id}", reportRL(authMw(http.HandlerFunc(h.consultation.ListByDentist))))
+	mux.Handle("GET /v1/api/consultations/patient/{patient_id}", reportProtect(http.HandlerFunc(h.consultation.ListByPatient)))
+	mux.Handle("GET /v1/api/consultations/dentist/{dentist_id}", reportProtect(http.HandlerFunc(h.consultation.ListByDentist)))
 
 	// Stack global: RequestID → RequestLogger → SecurityHeaders → CORS → Metrics → rotas
 	return middleware.RequestID(

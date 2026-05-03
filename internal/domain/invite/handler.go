@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/Mirnda/mirandaclin/internal/middleware"
 	"github.com/Mirnda/mirandaclin/pkg/logger"
 	"github.com/Mirnda/mirandaclin/pkg/response"
 	"github.com/Mirnda/mirandaclin/pkg/validator"
-	"github.com/google/uuid"
 )
 
 type Handler struct {
@@ -20,15 +20,14 @@ func NewHandler(svc *Service) *Handler {
 }
 
 type createInviteRequest struct {
-	TenantID string `json:"tenant_id" validate:"required,uuid"`
-	Email    string `json:"email"     validate:"required,email"`
-	Role     string `json:"role"      validate:"required,oneof=admin dentist secretary patient"`
-	Password string `json:"password"  validate:"required,min=8"`
+	Email    string `json:"email"    validate:"required,email"`
+	Role     string `json:"role"     validate:"required,oneof=admin dentist secretary patient"`
+	Password string `json:"password" validate:"required,min=8"`
 }
 
 // @Summary     Gerar convite por email
 // @Tags        invites
-// @Security    ApiKeyAuth
+// @Security    BearerAuth
 // @Accept      json
 // @Produce     json
 // @Param       body body createInviteRequest true "Dados do convite"
@@ -41,29 +40,20 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	var ctx = r.Context()
 	var log = logger.FromContext(ctx)
 
-	log.Info("init createInviteRequest")
-
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	var req createInviteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Error("erro ao gerar convite",
-			logger.Err(err),
-		)
 		response.Error(w, http.StatusBadRequest, "payload inválido")
 		return
 	}
-
-	log = log.With(logger.String("tenant_id", req.TenantID))
-
 	if errs := validator.Validate(req); errs != nil {
-		log.Error("erro ao gerar convite",
-			logger.String("validator", fmt.Sprintf("%v", errs)),
-		)
+		log.Error("erro ao gerar convite", logger.String("validator", fmt.Sprintf("%v", errs)))
 		response.Error(w, http.StatusBadRequest, "dados inválidos")
 		return
 	}
 
-	tenantID, _ := uuid.Parse(req.TenantID)
+	tenantID := middleware.TenantFromContext(ctx)
+	log = log.With(logger.String("tenant_id", tenantID.String()))
 
 	inv, err := h.svc.Create(ctx, CreateRequest{
 		TenantID: tenantID,
@@ -72,9 +62,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		Password: req.Password,
 	})
 	if err != nil {
-		log.Error("erro ao gerar convite",
-			logger.Err(err),
-		)
+		log.Error("erro ao gerar convite", logger.Err(err))
 		response.Error(w, http.StatusInternalServerError, "erro interno")
 		return
 	}
