@@ -62,6 +62,7 @@ func main() {
 	inviteRepo := repository.NewInviteRepository()
 	tenantRepo := repository.NewTenantRepository()
 	memberRepo := repository.NewTenantMemberRepository()
+	emailVerifRepo := repository.NewEmailVerificationRepository()
 	clinicRepo := repository.NewClinicRepository()
 	dcRepo := repository.NewDentistClinicRepository()
 	blockRepo := repository.NewDentistBlockRepository()
@@ -77,7 +78,7 @@ func main() {
 	}
 
 	// Services
-	userSvc := user.NewService(db, userRepo, inviteRepo, tenantRepo, memberRepo, cache, cfg.JWTSecret)
+	userSvc := user.NewService(db, userRepo, inviteRepo, tenantRepo, memberRepo, emailVerifRepo, ml, cache, cfg.JWTSecret, cfg.AppURL)
 	inviteSvc := invite.NewService(db, inviteRepo, ml, cfg.AppURL)
 	clinicSvc := clinic.NewService(db, clinicRepo)
 	apptSvc := appointment.NewService(db, apptRepo, dcRepo, blockRepo)

@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS clinics (
     address_city         TEXT,
     address_state        TEXT,
     address_country      TEXT,
+    address_latitude     TEXT,
+    address_longitude    TEXT,
     operating_days       TEXT[],
     open_time            TEXT,
     close_time           TEXT,

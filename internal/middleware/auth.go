@@ -60,12 +60,13 @@ func Auth(secret string) func(http.Handler) http.Handler {
 				return
 			}
 
-			EnrichRequestLog(ctx, tenantID.String(), userID.String())
+			EnrichRequestLog(ctx, tenantID.String(), userID.String(), claims.ID)
 
 			ctx = context.WithValue(ctx, keyTenantID, tenantID)
 			ctx = context.WithValue(ctx, keyUserID, userID)
 			ctx = context.WithValue(ctx, keyRole, claims.Role)
 			ctx = context.WithValue(ctx, keyScope, claims.Scope)
+			ctx = context.WithValue(ctx, keySessionID, claims.ID)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

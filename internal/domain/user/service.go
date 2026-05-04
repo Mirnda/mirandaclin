@@ -5,13 +5,16 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"time"
 
+	emailverification "github.com/Mirnda/mirandaclin/internal/domain/email_verification"
 	"github.com/Mirnda/mirandaclin/internal/domain/invite"
 	"github.com/Mirnda/mirandaclin/internal/domain/tenant"
 	tenantmember "github.com/Mirnda/mirandaclin/internal/domain/tenant_member"
 	"github.com/Mirnda/mirandaclin/internal/infra/cache"
 	"github.com/Mirnda/mirandaclin/pkg/logger"
+	"github.com/Mirnda/mirandaclin/pkg/mailer"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -20,6 +23,7 @@ import (
 
 var (
 	ErrEmailConflict   = errors.New("email já cadastrado")
+	ErrTenantConflict  = errors.New("namespace inválido")
 	ErrInvalidCreds    = errors.New("credenciais inválidas")
 	ErrUserNotFound    = errors.New("usuário não encontrado")
 	ErrTenantRequired  = errors.New("informe o tenant_id para autenticar")
@@ -62,13 +66,16 @@ type AcceptInviteRequest struct {
 }
 
 type Service struct {
-	db         *gorm.DB
-	userRepo   Repository
-	inviteRepo invite.Repository
-	tenantRepo tenant.Repository
-	memberRepo tenantmember.Repository
-	cache      cache.Cache
-	jwtSecret  string
+	db             *gorm.DB
+	userRepo       Repository
+	inviteRepo     invite.Repository
+	tenantRepo     tenant.Repository
+	memberRepo     tenantmember.Repository
+	emailVerifRepo emailverification.Repository
+	mailer         mailer.Mailer
+	cache          cache.Cache
+	jwtSecret      string
+	appURL         string
 }
 
 func NewService(
@@ -77,33 +84,57 @@ func NewService(
 	ir invite.Repository,
 	tr tenant.Repository,
 	mr tenantmember.Repository,
+	evr emailverification.Repository,
+	ml mailer.Mailer,
 	c cache.Cache,
 	secret string,
+	appURL string,
 ) *Service {
 	return &Service{
-		db:         db,
-		userRepo:   ur,
-		inviteRepo: ir,
-		tenantRepo: tr,
-		memberRepo: mr,
-		cache:      c,
-		jwtSecret:  secret,
+		db:             db,
+		userRepo:       ur,
+		inviteRepo:     ir,
+		tenantRepo:     tr,
+		memberRepo:     mr,
+		emailVerifRepo: evr,
+		mailer:         ml,
+		cache:          c,
+		jwtSecret:      secret,
+		appURL:         appURL,
 	}
 }
 
-// Register cria um novo tenant e seu primeiro usuário (admin) em transação única.
-func (s *Service) Register(ctx context.Context, req RegisterRequest) (string, error) {
+// Register cria um novo tenant e seu primeiro usuário (admin), depois envia email de confirmação.
+// caso Tenant não seja enviado, considera email do usuario como nome do tenant
+func (s *Service) Register(ctx context.Context, req RegisterRequest) error {
 	existing, err := s.userRepo.FindByEmail(ctx, s.db, req.Email)
 	if err != nil {
-		return "", err
+		return err
 	}
 	if existing != nil {
-		return "", ErrEmailConflict
+		return ErrEmailConflict
+	}
+
+	if req.TenantName == "" {
+		req.TenantName = req.Email
+	}
+
+	existingTenant, err := s.tenantRepo.FindByName(ctx, s.db, req.TenantName)
+	if err != nil {
+		return err
+	}
+	if existingTenant != nil {
+		return ErrTenantConflict
 	}
 
 	salt, hash, err := hashPassword(req.Password)
 	if err != nil {
-		return "", err
+		return err
+	}
+
+	verifyToken, err := generateToken()
+	if err != nil {
+		return err
 	}
 
 	t := &tenant.Tenant{Name: req.TenantName}
@@ -119,6 +150,10 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (string, er
 		EmergencyContactPhone: req.EmergencyContactPhone,
 	}
 	m := &tenantmember.TenantMember{Role: RoleAdmin}
+	ev := &emailverification.EmailVerification{
+		Token:     verifyToken,
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+	}
 
 	var log = logger.FromContext(ctx)
 	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -130,18 +165,22 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (string, er
 		}
 		m.UserID = u.ID
 		m.TenantID = t.ID
-		return s.memberRepo.Create(ctx, tx, m)
+		if err := s.memberRepo.Create(ctx, tx, m); err != nil {
+			return err
+		}
+		ev.UserID = u.ID
+		return s.emailVerifRepo.Create(ctx, tx, ev)
 	})
 	if err != nil {
-		log.Error("erro ao registrar clínica", logger.Err(err))
-		return "", err
+		log.Error("erro ao registrar usuário/tenant", logger.Err(err))
+		return err
 	}
 
 	log.Info("tenant registrado", logger.String("tenant_id", t.ID.String()), logger.String("user_id", u.ID.String()))
-	return s.issueJWT(u, m)
+	return s.sendVerificationEmail(ctx, req.Email, verifyToken)
 }
 
-// Create adiciona um novo usuário a um tenant existente.
+// Create adiciona um novo usuário a um tenant existente e envia email de confirmação.
 func (s *Service) Create(ctx context.Context, req CreateRequest) (*User, error) {
 	existing, err := s.userRepo.FindByEmail(ctx, s.db, req.Email)
 	if err != nil {
@@ -152,6 +191,11 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (*User, error) 
 	}
 
 	salt, hash, err := hashPassword(req.Password)
+	if err != nil {
+		return nil, err
+	}
+
+	verifyToken, err := generateToken()
 	if err != nil {
 		return nil, err
 	}
@@ -168,6 +212,10 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (*User, error) 
 		EmergencyContactPhone: req.EmergencyContactPhone,
 	}
 	m := &tenantmember.TenantMember{TenantID: req.TenantID, Role: req.Role}
+	ev := &emailverification.EmailVerification{
+		Token:     verifyToken,
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+	}
 
 	var log = logger.FromContext(ctx)
 	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -175,7 +223,11 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (*User, error) 
 			return err
 		}
 		m.UserID = u.ID
-		return s.memberRepo.Create(ctx, tx, m)
+		if err := s.memberRepo.Create(ctx, tx, m); err != nil {
+			return err
+		}
+		ev.UserID = u.ID
+		return s.emailVerifRepo.Create(ctx, tx, ev)
 	})
 	if err != nil {
 		log.Error("erro ao criar usuário", logger.String("tenant_id", req.TenantID.String()), logger.Err(err))
@@ -183,7 +235,25 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (*User, error) 
 	}
 
 	log.Info("usuário criado", logger.String("tenant_id", req.TenantID.String()), logger.String("user_id", u.ID.String()))
-	return u, nil
+	return u, s.sendVerificationEmail(ctx, req.Email, verifyToken)
+}
+
+func (s *Service) VerifyEmail(ctx context.Context, token string) error {
+	ev, err := s.emailVerifRepo.FindByToken(ctx, s.db, token)
+	if err != nil {
+		return err
+	}
+	if ev == nil || ev.UsedAt != nil || time.Now().After(ev.ExpiresAt) {
+		return emailverification.ErrInvalidToken
+	}
+
+	now := time.Now()
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&User{}).Where("id = ?", ev.UserID).Update("email_verified_at", now).Error; err != nil {
+			return err
+		}
+		return s.emailVerifRepo.MarkUsed(ctx, tx, ev.ID)
+	})
 }
 
 func (s *Service) Login(ctx context.Context, req LoginRequest) (string, error) {
@@ -287,14 +357,35 @@ func (s *Service) AcceptInvite(ctx context.Context, req AcceptInviteRequest) (st
 	return s.issueJWT(u, m)
 }
 
+func (s *Service) sendVerificationEmail(ctx context.Context, to, token string) error {
+	link := fmt.Sprintf("https://localhost:8080/v1/api/auth/verify-email?token=%s", token) //TODO
+
+	body := fmt.Sprintf(
+		`<p>Bem-vindo ao mirandaclin! Confirme seu email para ativar sua conta.</p>`+
+			`<p><a href="%s">Clique aqui para verificar seu email</a></p>`+
+			`<p>O link expira em 24 horas.</p>`, link)
+
+	err := s.mailer.Send(ctx, to, "Confirme seu email — mirandaclin", body)
+	if err != nil {
+		logger.FromContext(ctx).Error("falha ao enviar email de verificação",
+			logger.String("to", to),
+			logger.Err(err),
+		)
+	}
+
+	return err
+}
+
 func (s *Service) issueJWT(u *User, m *tenantmember.TenantMember) (string, error) {
 	claims := jwt.MapClaims{
-		"sub":       u.ID.String(),
-		"tenant_id": m.TenantID.String(),
-		"role":      m.Role,
-		"scope":     ScopeForRole(m.Role),
-		"exp":       time.Now().Add(time.Hour).Unix(),
-		"iat":       time.Now().Unix(),
+		"jti":            uuid.New().String(),
+		"sub":            u.ID.String(),
+		"tenant_id":      m.TenantID.String(),
+		"role":           m.Role,
+		"scope":          ScopeForRole(m.Role),
+		"email_verified": u.EmailVerifiedAt != nil,
+		"exp":            time.Now().Add(time.Hour).Unix(),
+		"iat":            time.Now().Unix(),
 	}
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(s.jwtSecret))
 }
@@ -311,4 +402,12 @@ func hashPassword(password string) (salt, hash string, err error) {
 	}
 	hash = string(h)
 	return
+}
+
+func generateToken() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }

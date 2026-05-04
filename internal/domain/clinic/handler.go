@@ -3,6 +3,7 @@ package clinic
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/Mirnda/mirandaclin/internal/domain/shared"
@@ -131,6 +132,70 @@ func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.OK(w, "ok", c)
+}
+
+type updateClinicRequest struct {
+	Name          *string              `json:"name"`
+	Phone         *string              `json:"phone"`
+	Address       *shared.AddressInput `json:"address"`
+	OperatingDays *[]string            `json:"operating_days"`
+	OpenTime      *string              `json:"open_time"`
+	CloseTime     *string              `json:"close_time"`
+}
+
+// @Summary     Atualizar clínica
+// @Tags        clinics
+// @Security    BearerAuth
+// @Accept      json
+// @Produce     json
+// @Param       id   path string              true "Clinic ID"
+// @Param       body body updateClinicRequest true "Campos a atualizar"
+// @Success     200 {object} response.Response{data=Clinic}
+// @Failure     400 {object} response.Response
+// @Failure     404 {object} response.Response
+// @Router      /v1/api/clinics/{id} [put]
+func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
+	var ctx = r.Context()
+	var log = logger.FromContext(ctx)
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		log.With(logger.Err(err)).Warn("erro ao atualizar clínica")
+		response.Error(w, http.StatusBadRequest, "id inválido")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	var req updateClinicRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.With(logger.Err(err)).Warn("erro ao atualizar clínica")
+		response.Error(w, http.StatusBadRequest, "payload inválido")
+		return
+	}
+	if errs := validator.Validate(req); errs != nil {
+		log.With(logger.String("validate", fmt.Sprintf("%#v", errs))).Warn("dados inválidos")
+		response.Error(w, http.StatusBadRequest, "dados inválidos")
+		return
+	}
+
+	tenantID := middleware.TenantFromContext(ctx)
+
+	c, err := h.svc.Update(ctx, tenantID, id, UpdateRequest(req))
+	if errors.Is(err, ErrClinicNotFound) {
+		log.With(logger.Err(err)).Warn("erro ao atualizar clínica")
+		response.Error(w, http.StatusNotFound, "clínica não encontrada")
+		return
+	}
+	if err != nil {
+		log.Error("erro ao atualizar clínica",
+			logger.String("tenant_id", tenantID.String()),
+			logger.String("clinic_id", id.String()),
+			logger.Err(err),
+		)
+		response.Error(w, http.StatusInternalServerError, "erro interno")
+		return
+	}
+	response.OK(w, "clínica atualizada com sucesso", c)
 }
 
 // @Summary     Remover clínica

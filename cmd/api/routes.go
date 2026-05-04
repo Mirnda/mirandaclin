@@ -64,6 +64,7 @@ func registerRoutes(mux *http.ServeMux, h handlers, cfg *config.Config, c cache.
 
 	// Auth — rotas públicas
 	mux.Handle("POST /v1/api/auth/register", publicRL(http.HandlerFunc(h.user.Register)))
+	mux.Handle("GET /v1/api/auth/verify-email", publicRL(http.HandlerFunc(h.user.VerifyEmail)))
 	mux.Handle("POST /v1/api/auth/login", publicRL(http.HandlerFunc(h.user.Login)))
 
 	// Invites
@@ -78,6 +79,7 @@ func registerRoutes(mux *http.ServeMux, h handlers, cfg *config.Config, c cache.
 	mux.Handle("POST /v1/api/clinics", protect(http.HandlerFunc(h.clinic.Create)))
 	mux.Handle("GET /v1/api/clinics", protect(http.HandlerFunc(h.clinic.List)))
 	mux.Handle("GET /v1/api/clinics/{id}", protect(http.HandlerFunc(h.clinic.GetByID)))
+	mux.Handle("PUT /v1/api/clinics/{id}", protect(http.HandlerFunc(h.clinic.Update)))
 	mux.Handle("DELETE /v1/api/clinics/{id}", protect(http.HandlerFunc(h.clinic.Delete)))
 
 	// Appointments

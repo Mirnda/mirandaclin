@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS users (
     id                      UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     email                   TEXT        NOT NULL,
+    email_verified_at       TIMESTAMPTZ,
     password_hash           TEXT,
     salt                    TEXT,
     full_name               TEXT,
@@ -18,6 +19,8 @@ CREATE TABLE IF NOT EXISTS users (
     address_city            TEXT,
     address_state           TEXT,
     address_country         TEXT,
+    address_latitude        TEXT,
+    address_longitude       TEXT,
     created_at              TIMESTAMPTZ DEFAULT NOW(),
     updated_at              TIMESTAMPTZ,
     deleted_at              TIMESTAMPTZ

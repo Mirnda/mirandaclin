@@ -5,14 +5,14 @@ import "github.com/google/uuid"
 type contextKey string
 
 const (
-	// keyRequestID contextKey = "request_id" || TODO REMOVER
-	keyTenantID contextKey = "tenant_id"
-	keyUserID   contextKey = "user_id"
-	keyRole     contextKey = "role"
-	keyScope    contextKey = "scope"
+	keyTenantID  contextKey = "tenant_id"
+	keyUserID    contextKey = "user_id"
+	keyRole      contextKey = "role"
+	keyScope     contextKey = "scope"
+	keySessionID contextKey = "session_id"
 )
 
-// TenantFromContext extrai o tenant_id injetado pelo middleware de tenant.
+// TenantFromContext extrai o tenant_id injetado pelo middleware de auth.
 func TenantFromContext(ctx interface{ Value(any) any }) uuid.UUID {
 	if v, ok := ctx.Value(keyTenantID).(uuid.UUID); ok {
 		return v
@@ -34,8 +34,8 @@ func RoleFromContext(ctx interface{ Value(any) any }) string {
 	return v
 }
 
-// // RequestIDFromContext extrai o request_id gerado pelo middleware.  || TODO REMOVER
-// func RequestIDFromContext(ctx interface{ Value(any) any }) string {
-// 	v, _ := ctx.Value(keyRequestID).(string)
-// 	return v
-// }
+// SessionIDFromContext extrai o session_id (jti do JWT) injetado pelo middleware de auth.
+func SessionIDFromContext(ctx interface{ Value(any) any }) string {
+	v, _ := ctx.Value(keySessionID).(string)
+	return v
+}

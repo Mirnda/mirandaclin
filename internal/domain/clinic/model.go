@@ -16,8 +16,8 @@ type Clinic struct {
 	Phone         string         `json:"phone"`
 	Address       shared.Address `gorm:"embedded;embeddedPrefix:address_" json:"address"`
 	OperatingDays pq.StringArray `gorm:"type:text[]" json:"operating_days" swaggertype:"array,string"` // "monday"..."sunday"
-	OpenTime      string         `json:"open_time"`                                       // "08:00"
-	CloseTime     string         `json:"close_time"`                                      // "18:00"
+	OpenTime      string         `json:"open_time"`                                                    // "08:00"
+	CloseTime     string         `json:"close_time"`                                                   // "18:00"
 	CreatedAt     time.Time      `json:"created_at"`
 	UpdatedAt     time.Time      `json:"updated_at"`
 	DeletedAt     gorm.DeletedAt `gorm:"index"                    json:"-"`

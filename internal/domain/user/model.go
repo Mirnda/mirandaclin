@@ -25,6 +25,7 @@ const (
 type User struct {
 	ID                    uuid.UUID      `gorm:"type:uuid;primaryKey" json:"id"`
 	Email                 string         `gorm:"not null;uniqueIndex" json:"email"`
+	EmailVerifiedAt       *time.Time     `json:"email_verified_at,omitempty"`
 	PasswordHash          string         `json:"-"`
 	Salt                  string         `json:"-"`
 	FullName              string         `json:"full_name"`

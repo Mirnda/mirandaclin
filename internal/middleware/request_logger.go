@@ -20,18 +20,20 @@ func (sw *statusWriter) WriteHeader(status int) {
 }
 
 type requestLogFields struct {
-	tenantID string
-	userID   string
+	tenantID  string
+	userID    string
+	sessionID string
 }
 
 type requestLogKey struct{}
 
-// EnrichRequestLog é chamado pelo middleware de auth para adicionar tenant_id e user_id ao log da requisição.
+// EnrichRequestLog é chamado pelo middleware de auth para adicionar tenant_id, user_id e session_id ao log da requisição.
 // Funciona porque requestLogFields é um ponteiro compartilhado no contexto — qualquer ctx derivado o enxerga.
-func EnrichRequestLog(ctx context.Context, tenantID, userID string) {
+func EnrichRequestLog(ctx context.Context, tenantID, userID, sessionID string) {
 	if f, ok := ctx.Value(requestLogKey{}).(*requestLogFields); ok {
 		f.tenantID = tenantID
 		f.userID = userID
+		f.sessionID = sessionID
 	}
 }
 
@@ -82,6 +84,9 @@ func RequestLogger(log logger.Logger) func(http.Handler) http.Handler {
 			}
 			if fields.tenantID != "" {
 				logFields = append(logFields, logger.String("tenant_id", fields.tenantID))
+			}
+			if fields.sessionID != "" {
+				logFields = append(logFields, logger.String("session_id", fields.sessionID))
 			}
 			log.Debug("request", logFields...)
 		})
