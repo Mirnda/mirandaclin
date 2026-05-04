@@ -73,6 +73,7 @@ func registerRoutes(mux *http.ServeMux, h handlers, cfg *config.Config, c cache.
 
 	// Users
 	mux.Handle("POST /v1/api/users", protect(http.HandlerFunc(h.user.Create)))
+	mux.Handle("GET /v1/api/users", protect(http.HandlerFunc(h.user.List)))
 	mux.Handle("GET /v1/api/users/{id}", protect(http.HandlerFunc(h.user.GetByID)))
 
 	// Clinics

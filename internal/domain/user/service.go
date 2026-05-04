@@ -310,6 +310,10 @@ func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	return u, nil
 }
 
+func (s *Service) List(ctx context.Context, tenantID uuid.UUID) ([]User, error) {
+	return s.userRepo.List(ctx, s.db, tenantID)
+}
+
 // AcceptInvite aceita um convite: cria usuário novo se o email não existe,
 // ou apenas adiciona ao tenant se o email já existe globalmente.
 func (s *Service) AcceptInvite(ctx context.Context, req AcceptInviteRequest) (string, error) {

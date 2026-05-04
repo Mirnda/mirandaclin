@@ -37,6 +37,15 @@ func (r *userRepository) FindByEmail(ctx context.Context, db *gorm.DB, email str
 	return &u, err
 }
 
+func (r *userRepository) List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) ([]user.User, error) {
+	var users []user.User
+	err := db.WithContext(ctx).
+		Joins("JOIN tenant_members ON tenant_members.user_id = users.id").
+		Where("tenant_members.tenant_id = ?", tenantID).
+		Find(&users).Error
+	return users, err
+}
+
 func (r *userRepository) Update(ctx context.Context, db *gorm.DB, u *user.User) error {
 	return db.WithContext(ctx).Save(u).Error
 }

@@ -298,3 +298,24 @@ func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 	}
 	response.OK(w, "ok", u)
 }
+
+// @Summary     Obter usuários por Tenant
+// @Tags        users
+// @Security    BearerAuth
+// @Produce     json
+// @Success     200 {object} response.Response{data=User}
+// @Failure     404 {object} response.Response
+// @Router      /v1/api/users [get]
+func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
+	tenantID := middleware.TenantFromContext(r.Context())
+	users, err := h.svc.List(r.Context(), tenantID)
+	if err != nil {
+		logger.FromContext(r.Context()).Error("erro ao buscar usuários",
+			logger.String("tenant_id", tenantID.String()),
+			logger.Err(err),
+		)
+		response.Error(w, http.StatusInternalServerError, "erro interno")
+		return
+	}
+	response.OK(w, "ok", users)
+}
