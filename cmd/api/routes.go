@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Mirnda/mirandaclin/internal/cep"
 	"github.com/Mirnda/mirandaclin/internal/domain/appointment"
 	"github.com/Mirnda/mirandaclin/internal/domain/clinic"
 	"github.com/Mirnda/mirandaclin/internal/domain/consultation"
@@ -27,6 +28,7 @@ type handlers struct {
 	appointment  *appointment.Handler
 	consultation *consultation.Handler
 	health       *health.Handler
+	cep          *cep.Handler
 }
 
 // registerRoutes registra todas as rotas no mux e retorna o handler com o stack global de middlewares aplicado.
@@ -66,15 +68,26 @@ func registerRoutes(mux *http.ServeMux, h handlers, cfg *config.Config, c cache.
 	mux.Handle("POST /v1/api/auth/register", publicRL(http.HandlerFunc(h.user.Register)))
 	mux.Handle("GET /v1/api/auth/verify-email", publicRL(http.HandlerFunc(h.user.VerifyEmail)))
 	mux.Handle("POST /v1/api/auth/login", publicRL(http.HandlerFunc(h.user.Login)))
+	mux.Handle("POST /v1/api/auth/refresh", publicRL(http.HandlerFunc(h.user.Refresh)))
 
 	// Invites
 	mux.Handle("POST /v1/api/invites", inviteProtect(http.HandlerFunc(h.invite.Create)))
 	mux.Handle("POST /v1/api/invites/accept", publicRL(http.HandlerFunc(h.user.AcceptInvite)))
 
-	// Users
+	// Patients — profiles sem User vinculado (role=patient)
+	mux.Handle("POST /v1/api/patients", protect(http.HandlerFunc(h.user.CreatePatient)))
+	mux.Handle("GET /v1/api/patients", protect(http.HandlerFunc(h.user.ListPatients)))
+	mux.Handle("GET /v1/api/patients/search", protect(http.HandlerFunc(h.user.SearchPatients)))
+	mux.Handle("GET /v1/api/patients/{id}", protect(http.HandlerFunc(h.user.GetPatient)))
+	mux.Handle("PUT /v1/api/patients/{id}", protect(http.HandlerFunc(h.user.UpdatePatient)))
+	mux.Handle("DELETE /v1/api/patients/{id}", protect(http.HandlerFunc(h.user.DeletePatient)))
+
+	// Users (staff: admin, dentist, secretary)
 	mux.Handle("POST /v1/api/users", protect(http.HandlerFunc(h.user.Create)))
 	mux.Handle("GET /v1/api/users", protect(http.HandlerFunc(h.user.List)))
 	mux.Handle("GET /v1/api/users/{id}", protect(http.HandlerFunc(h.user.GetByID)))
+	mux.Handle("PUT /v1/api/users/{id}", protect(http.HandlerFunc(h.user.Update)))
+	mux.Handle("DELETE /v1/api/users/{id}", protect(http.HandlerFunc(h.user.Delete)))
 
 	// Clinics
 	mux.Handle("POST /v1/api/clinics", protect(http.HandlerFunc(h.clinic.Create)))
@@ -87,6 +100,9 @@ func registerRoutes(mux *http.ServeMux, h handlers, cfg *config.Config, c cache.
 	mux.Handle("POST /v1/api/appointments", protect(http.HandlerFunc(h.appointment.Create)))
 	mux.Handle("GET /v1/api/appointments/patient/{patient_id}", protect(http.HandlerFunc(h.appointment.ListByPatient)))
 	mux.Handle("PATCH /v1/api/appointments/{id}/cancel", protect(http.HandlerFunc(h.appointment.Cancel)))
+
+	// CEP — consulta endereço por CEP em APIs públicas
+	mux.Handle("GET /v1/api/cep/{cep}", protect(http.HandlerFunc(h.cep.Lookup)))
 
 	// Consultations — rate limit reduzido por ser rota de relatório
 	mux.Handle("POST /v1/api/consultations", protect(http.HandlerFunc(h.consultation.Create)))

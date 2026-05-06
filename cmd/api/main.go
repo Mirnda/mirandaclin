@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Mirnda/mirandaclin/internal/cep"
 	"github.com/Mirnda/mirandaclin/internal/domain/appointment"
 	"github.com/Mirnda/mirandaclin/internal/domain/clinic"
 	"github.com/Mirnda/mirandaclin/internal/domain/consultation"
@@ -59,9 +60,9 @@ func main() {
 
 	// Repositórios
 	userRepo := repository.NewUserRepository()
+	profileRepo := repository.NewProfileRepository()
 	inviteRepo := repository.NewInviteRepository()
 	tenantRepo := repository.NewTenantRepository()
-	memberRepo := repository.NewTenantMemberRepository()
 	emailVerifRepo := repository.NewEmailVerificationRepository()
 	clinicRepo := repository.NewClinicRepository()
 	dcRepo := repository.NewDentistClinicRepository()
@@ -78,7 +79,7 @@ func main() {
 	}
 
 	// Services
-	userSvc := user.NewService(db, userRepo, inviteRepo, tenantRepo, memberRepo, emailVerifRepo, ml, cache, cfg.JWTSecret, cfg.AppURL)
+	userSvc := user.NewService(db, userRepo, profileRepo, inviteRepo, tenantRepo, emailVerifRepo, ml, cache, cfg.JWTSecret, cfg.AppURL)
 	inviteSvc := invite.NewService(db, inviteRepo, ml, cfg.AppURL)
 	clinicSvc := clinic.NewService(db, clinicRepo)
 	apptSvc := appointment.NewService(db, apptRepo, dcRepo, blockRepo)
@@ -86,11 +87,12 @@ func main() {
 
 	// Handlers
 	h := handlers{
-		user:         user.NewHandler(userSvc),
+		user:         user.NewHandler(userSvc, cfg.AppEnv),
 		invite:       invite.NewHandler(inviteSvc),
 		clinic:       clinic.NewHandler(clinicSvc),
 		appointment:  appointment.NewHandler(apptSvc),
 		consultation: consultation.NewHandler(consultSvc),
+		cep:          cep.NewHandler(cache),
 		health:       health.NewHandler(db, cache),
 	}
 
@@ -98,7 +100,7 @@ func main() {
 	handler := registerRoutes(mux, h, cfg, cache, log)
 
 	addr := ":" + cfg.AppPort
-	log.Info("servidor iniciando", logger.String("addr", addr), logger.String("env", cfg.AppEnv))
+	log.Info("servidor iniciando", logger.String("addr", addr))
 
 	srv := &http.Server{
 		Addr:         addr,

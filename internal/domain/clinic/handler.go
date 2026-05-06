@@ -160,7 +160,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		log.With(logger.Err(err)).Warn("erro ao atualizar clínica")
+		log.WithErr(err).Warn("erro ao atualizar clínica")
 		response.Error(w, http.StatusBadRequest, "id inválido")
 		return
 	}
@@ -168,12 +168,12 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	var req updateClinicRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.With(logger.Err(err)).Warn("erro ao atualizar clínica")
+		log.WithErr(err).Warn("erro ao atualizar clínica")
 		response.Error(w, http.StatusBadRequest, "payload inválido")
 		return
 	}
 	if errs := validator.Validate(req); errs != nil {
-		log.With(logger.String("validate", fmt.Sprintf("%#v", errs))).Warn("dados inválidos")
+		log.WithField(logger.String("validate", fmt.Sprintf("%#v", errs))).Warn("dados inválidos")
 		response.Error(w, http.StatusBadRequest, "dados inválidos")
 		return
 	}
@@ -182,7 +182,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 
 	c, err := h.svc.Update(ctx, tenantID, id, UpdateRequest(req))
 	if errors.Is(err, ErrClinicNotFound) {
-		log.With(logger.Err(err)).Warn("erro ao atualizar clínica")
+		log.WithErr(err).Warn("erro ao atualizar clínica")
 		response.Error(w, http.StatusNotFound, "clínica não encontrada")
 		return
 	}

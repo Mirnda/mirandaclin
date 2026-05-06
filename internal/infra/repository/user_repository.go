@@ -21,7 +21,7 @@ func (r *userRepository) Create(ctx context.Context, db *gorm.DB, u *user.User) 
 
 func (r *userRepository) FindByID(ctx context.Context, db *gorm.DB, id uuid.UUID) (*user.User, error) {
 	var u user.User
-	err := db.WithContext(ctx).Where("id = ?", id).First(&u).Error
+	err := db.WithContext(ctx).Where("id = ? AND deleted_at IS NULL", id).First(&u).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -30,20 +30,11 @@ func (r *userRepository) FindByID(ctx context.Context, db *gorm.DB, id uuid.UUID
 
 func (r *userRepository) FindByEmail(ctx context.Context, db *gorm.DB, email string) (*user.User, error) {
 	var u user.User
-	err := db.WithContext(ctx).Where("email = ?", email).First(&u).Error
+	err := db.WithContext(ctx).Where("email = ? AND deleted_at IS NULL", email).First(&u).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	return &u, err
-}
-
-func (r *userRepository) List(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) ([]user.User, error) {
-	var users []user.User
-	err := db.WithContext(ctx).
-		Joins("JOIN tenant_members ON tenant_members.user_id = users.id").
-		Where("tenant_members.tenant_id = ?", tenantID).
-		Find(&users).Error
-	return users, err
 }
 
 func (r *userRepository) Update(ctx context.Context, db *gorm.DB, u *user.User) error {

@@ -9,6 +9,7 @@ import (
 	dentistblock "github.com/Mirnda/mirandaclin/internal/domain/dentist_block"
 	dentistclinic "github.com/Mirnda/mirandaclin/internal/domain/dentist_clinic"
 	"github.com/Mirnda/mirandaclin/pkg/logger"
+
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )

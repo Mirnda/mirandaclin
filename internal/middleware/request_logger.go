@@ -49,7 +49,7 @@ func RequestLogger(log logger.Logger) func(http.Handler) http.Handler {
 
 			// requestID := RequestIDFromContext(r.Context())  || TODO REMOVER
 			requestID := logger.GetRequestID(ctx)
-			tracedLog := log.With(logger.String("request_id", requestID))
+			tracedLog := log.With("request_id", requestID)
 
 			ctx = logger.WithContext(ctx, tracedLog)
 

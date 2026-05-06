@@ -6,7 +6,7 @@ SWAG_BIN=$(GOPATH)/bin/swag
 BINARY=bin/mirandaclin
 MAIN=./cmd/api
 
-.PHONY: up down clean test lint swagger build lint_doc test_doc
+.PHONY: up down clean test lint swagger build lint_doc test_doc lite
 
 up:
 	@echo "Iniciando containers..."
@@ -57,3 +57,7 @@ test_doc:
 		-w /app \
 		$(GO_IMAGE) \
 		go test -v ./...
+
+lite:
+	@echo "Iniciando containers reduzidos..."
+	docker compose up --build -d redis postgres api

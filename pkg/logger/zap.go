@@ -28,10 +28,11 @@ func New(env string) Logger {
 			zap.AddCallerSkip(1),
 			zap.AddStacktrace(zap.ErrorLevel),
 		)
-		z = z.With(String("env", env))
 	} else {
 		z, _ = zap.NewProduction(zap.AddCallerSkip(1))
 	}
+
+	z = z.With(String("env", env))
 	return &zapLogger{z: z}
 }
 
@@ -70,6 +71,12 @@ func (l *zapLogger) Error(msg string, fields ...Field) { l.z.Error(msg, fields..
 func (l *zapLogger) Debug(msg string, fields ...Field) { l.z.Debug(msg, fields...) }
 func (l *zapLogger) Sync() error                       { return l.z.Sync() }
 
-func (l *zapLogger) With(fields ...Field) Logger {
+func (l *zapLogger) With(key, value string) Logger {
+	return &zapLogger{z: l.z.With(String(key, value))}
+}
+func (l *zapLogger) WithField(fields ...Field) Logger {
 	return &zapLogger{z: l.z.With(fields...)}
+}
+func (l *zapLogger) WithErr(err error) Logger {
+	return &zapLogger{z: l.z.With(Err(err))}
 }

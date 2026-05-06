@@ -53,7 +53,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tenantID := middleware.TenantFromContext(ctx)
-	log = log.With(logger.String("tenant_id", tenantID.String()))
+	log = log.WithField(logger.String("tenant_id", tenantID.String()))
 
 	inv, err := h.svc.Create(ctx, CreateRequest{
 		TenantID: tenantID,

@@ -19,5 +19,8 @@ func (n *noopCache) Get(_ context.Context, _ string) (string, error) {
 }
 func (n *noopCache) Set(_ context.Context, _, _ string, _ time.Duration) error { return nil }
 func (n *noopCache) Del(_ context.Context, _ ...string) error                  { return nil }
+func (n *noopCache) DelWithPrefix(_ context.Context, _ string) ([]string, error) {
+	return []string{}, nil
+}
 func (n *noopCache) Incr(_ context.Context, _ string) (int64, error)           { return 0, nil }
 func (n *noopCache) Expire(_ context.Context, _ string, _ time.Duration) error { return nil }

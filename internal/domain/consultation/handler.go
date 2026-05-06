@@ -22,8 +22,8 @@ func NewHandler(svc *Service) *Handler {
 type createConsultationRequest struct {
 	AppointmentID string `json:"appointment_id" validate:"required,uuid"`
 	PatientID     string `json:"patient_id"     validate:"required,uuid"`
-	Diagnosis     string `json:"diagnosis"      validate:"required"`
-	Treatment     string `json:"treatment"      validate:"required"`
+	Diagnosis     string `json:"diagnosis"`
+	Treatment     string `json:"treatment"`
 }
 
 // @Summary     Criar relatório de consulta

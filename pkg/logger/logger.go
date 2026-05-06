@@ -11,6 +11,8 @@ type Logger interface {
 	Warn(msg string, fields ...Field)
 	Error(msg string, fields ...Field)
 	Debug(msg string, fields ...Field)
-	With(fields ...Field) Logger
+	With(key, value string) Logger
+	WithField(fields ...Field) Logger
+	WithErr(err error) Logger
 	Sync() error
 }

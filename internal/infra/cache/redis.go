@@ -36,6 +36,19 @@ func (r *redisCache) Del(ctx context.Context, keys ...string) error {
 	return r.client.Del(ctx, keys...).Err()
 }
 
+func (r *redisCache) DelWithPrefix(ctx context.Context, prefix string) ([]string, error) {
+	var deletedKeys []string
+	iter := r.client.Scan(ctx, 0, prefix, 0).Iterator()
+	for iter.Next(ctx) {
+		if err := r.client.Del(ctx, iter.Val()).Err(); err != nil {
+			return deletedKeys, err
+		}
+		deletedKeys = append(deletedKeys, iter.Val())
+	}
+
+	return deletedKeys, nil
+}
+
 func (r *redisCache) Incr(ctx context.Context, key string) (int64, error) {
 	return r.client.Incr(ctx, key).Result()
 }
