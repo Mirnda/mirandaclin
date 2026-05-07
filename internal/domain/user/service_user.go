@@ -10,6 +10,7 @@ import (
 
 	"github.com/Mirnda/mirandaclin/internal/domain/invite"
 	"github.com/Mirnda/mirandaclin/internal/domain/profile"
+	"github.com/Mirnda/mirandaclin/internal/domain/shared"
 	"github.com/Mirnda/mirandaclin/pkg/logger"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -26,7 +27,7 @@ var (
 // Create adiciona um novo usuário (staff) a um tenant existente.
 // Rejeita role=patient — pacientes são criados via CreatePatient.
 func (s *Service) Create(ctx context.Context, req CreateRequest) (*UserWithProfile, error) {
-	if req.Role == RolePatient {
+	if req.Role == shared.RolePatient {
 		return nil, ErrInvalidRole
 	}
 
@@ -111,7 +112,7 @@ func (s *Service) List(ctx context.Context, tenantID uuid.UUID) ([]UserWithProfi
 	result := make([]UserWithProfile, 0, len(profiles))
 	for i := range profiles {
 		p := &profiles[i]
-		if p.Role == RolePatient || p.UserID == nil {
+		if p.Role == shared.RolePatient || p.UserID == nil {
 			continue
 		}
 		u, err := s.userRepo.FindByID(ctx, s.db, *p.UserID)
