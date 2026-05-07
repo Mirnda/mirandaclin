@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <title>{{.AppName}} - Código de Verificação</title>
+</head>
+
+<body style="font-family: Arial, sans-serif;">
+
+    <h2>{{.AppName}} lhe dá boas vindas,</h2>
+
+    <p>Olá, {{.UserName}}</p>
+
+    <p> Para seguir com o seu cadastro, use o código de verificação abaixo no seu aplicativo. </p>
+
+    <p> Mantenha sua conta segura e não compartilhe seu código de confirmação com mais ninguém. </p>
+
+    <span style="color:#0970e6;font-size:30px;font-weight:bold;;padding:24px 0">
+        <strong>{{.VerificationCode}}</strong>
+    </span>
+
+    <a href="{{.VerificationURL}}">Confirmar E-mail</a>
+
+</body>
+
+</html>

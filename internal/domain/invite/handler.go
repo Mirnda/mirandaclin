@@ -2,6 +2,7 @@ package invite
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/Mirnda/mirandaclin/pkg/logger"
 	"github.com/Mirnda/mirandaclin/pkg/response"
 	"github.com/Mirnda/mirandaclin/pkg/validator"
+	"github.com/google/uuid"
 )
 
 type Handler struct {
@@ -20,20 +22,21 @@ func NewHandler(svc *Service) *Handler {
 }
 
 type createInviteRequest struct {
-	Email    string `json:"email"    validate:"required,email"`
-	Role     string `json:"role"     validate:"required,oneof=admin dentist secretary patient"`
-	Password string `json:"password" validate:"required,min=8"`
+	Email     string    `json:"email"      validate:"required,email"`
+	ProfileID uuid.UUID `json:"profile_id" validate:"required"`
 }
 
-// @Summary     Gerar convite por email
+// @Summary     Enviar convite por email para um perfil sem usuário
 // @Tags        invites
 // @Security    BearerAuth
 // @Accept      json
 // @Produce     json
 // @Param       body body createInviteRequest true "Dados do convite"
-// @Success     201 {object} response.Response{data=Invite}
+// @Success     201 {object} response.Response
 // @Failure     400 {object} response.Response
 // @Failure     401 {object} response.Response
+// @Failure     409 {object} response.Response
+// @Failure     422 {object} response.Response
 // @Failure     500 {object} response.Response
 // @Router      /v1/api/invites [post]
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
@@ -55,18 +58,30 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	tenantID := middleware.TenantFromContext(ctx)
 	log = log.WithField(logger.String("tenant_id", tenantID.String()))
 
-	inv, err := h.svc.Create(ctx, CreateRequest{
-		TenantID: tenantID,
-		Email:    req.Email,
-		Role:     req.Role,
-		Password: req.Password,
+	err := h.svc.Create(ctx, CreateRequest{
+		TenantID:  tenantID,
+		Email:     req.Email,
+		ProfileID: req.ProfileID,
 	})
 	if err != nil {
+		if errors.Is(err, ErrProfileNotFound) {
+			response.Error(w, http.StatusNotFound, "perfil não encontrado")
+			return
+		}
+		if errors.Is(err, ErrProfileAlreadyLinked) {
+			response.Error(w, http.StatusConflict, err.Error())
+			return
+		}
+		if errors.Is(err, ErrInvalidProfileRole) {
+			response.Error(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+
 		log.Error("erro ao gerar convite", logger.Err(err))
 		response.Error(w, http.StatusInternalServerError, "erro interno")
 		return
 	}
 
 	log.Info("convite enviado com sucesso")
-	response.Created(w, "convite enviado com sucesso", inv)
+	response.Created(w, "convite enviado com sucesso", nil)
 }

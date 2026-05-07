@@ -4,96 +4,122 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
+
+	"github.com/Mirnda/mirandaclin/pkg/validator"
 )
 
 type Config struct {
-	AppName string
-	AppPort string
-	AppEnv  string
+	App    App      `json:"app" validate:"required"`
+	DB     DataBase `json:"db" validate:"required"`
+	Redis  Redis    `json:"redis"` // optional — if empty, cache is disabled
+	JWT    JWT      `json:"jwt" validate:"required"`
+	Mailer SMTP     `json:"mailer"` // optional — if empty, mailer is logged
+}
 
-	DBHost    string
-	DBPort    string
-	DBUser    string
-	DBPass    string
-	DBName    string
-	DBSSLMode string
+type App struct {
+	Name     string `json:"name" validate:"required"`
+	Env      string `json:"env" validate:"required,oneof=production staging development"`
+	HostName string `json:"host" validate:"required,hostname|ip"`
+	Port     string `json:"port" validate:"required"`
 
-	RedisAddr     string
-	RedisPassword string
-	RedisDB       int
+	RateLimitEnabled   bool   `json:"rate_limit_enabled" validate:"required"`
+	CORSAllowedOrigins string `json:"cors" validate:"required"`
 
-	JWTSecret  string
-	JWTIssuer  string
-	JWTJWKSURL string
+	Frontend Client `json:"frontend" validate:"required"`
+}
 
-	APIKey string
+type Client struct {
+	HostName            string `json:"host" validate:"required,hostname|ip"`
+	Port                string `json:"port" validate:"required"`
+	VerifyUserEmailPath string `json:"verify_email_url_path" validate:"required"`
+}
 
-	CORSAllowedOrigins string
-	RateLimitEnabled   bool
+type DataBase struct {
+	Driver  string `json:"driver" validate:"required,oneof=postgres"`
+	Host    string `json:"host" validate:"required,hostname|ip"`
+	Port    string `json:"port" validate:"required"`
+	User    string `json:"user" validate:"required"`
+	Pass    string `json:"pass" validate:"required"`
+	Name    string `json:"name" validate:"required"`
+	SSLMode string `json:"sslmode" validate:"required,oneof=disable require allow prefer verify-ca verify-full"`
+}
 
-	SMTPHost string
-	SMTPPort string
-	SMTPUser string
-	SMTPPass string
-	SMTPFrom string
-	AppURL   string
+type Redis struct {
+	Addr     string `json:"addr"`
+	Password string `json:"password"`
+	DB       int    `json:"db"`
+}
+
+type JWT struct {
+	Secret  string `json:"secret" validate:"required"`
+	Issuer  string `json:"issuer" validate:"required"`
+	JWKSUrl string `json:"jwksUrl" validate:"required,url"`
+}
+
+type SMTP struct {
+	Host string `json:"host"`
+	Port string `json:"port"`
+	User string `json:"user"`
+	Pass string `json:"pass"`
+	From string `json:"from"`
 }
 
 func Load() (*Config, error) {
 	redisDB, _ := strconv.Atoi(env("REDIS_DB", "0"))
 	rateLimitEnabled, _ := strconv.ParseBool(env("RATE_LIMIT_ENABLED", "true"))
 
-	cfg := &Config{
-		AppName: env("APP_NAME", "mirandaclin"),
-		AppPort: env("APP_PORT", "8080"),
-		AppEnv:  env("APP_ENV", "development"),
-
-		DBHost:    env("DB_HOST", "localhost"),
-		DBPort:    env("DB_PORT", "5432"),
-		DBUser:    env("DB_USER", "postgres"),
-		DBPass:    env("DB_PASS", ""),
-		DBName:    env("DB_NAME", "mirandaclin"),
-		DBSSLMode: env("DB_SSLMODE", "disable"),
-
-		RedisAddr:     env("REDIS_ADDR", "localhost:6379"),
-		RedisPassword: env("REDIS_PASSWORD", ""),
-		RedisDB:       redisDB,
-
-		JWTSecret:  env("JWT_SECRET", ""),
-		JWTIssuer:  env("JWT_ISSUER", ""),
-		JWTJWKSURL: env("JWT_JWKS_URL", ""),
-
-		APIKey: env("API_KEY", ""),
-
-		CORSAllowedOrigins: env("CORS_ALLOWED_ORIGINS", ""),
-		RateLimitEnabled:   rateLimitEnabled,
-
-		SMTPHost: env("SMTP_HOST", ""),
-		SMTPPort: env("SMTP_PORT", "587"),
-		SMTPUser: env("SMTP_USER", ""),
-		SMTPPass: env("SMTP_PASS", ""),
-		SMTPFrom: env("SMTP_FROM", ""),
-		AppURL:   env("APP_URL", "http://localhost:3000"),
+	cfg := Config{
+		App: App{
+			Name:               env("APP_NAME", ""),
+			Env:                env("APP_ENV", ""),
+			HostName:           env("APP_HOSTNAME", ""),
+			Port:               env("APP_PORT", "8080"),
+			RateLimitEnabled:   rateLimitEnabled,
+			CORSAllowedOrigins: env("CORS_ALLOWED_ORIGINS", ""),
+			Frontend: Client{
+				HostName:            env("CLIENT_HOSTNAME", ""),
+				Port:                env("CLIENT_PORT", ""),
+				VerifyUserEmailPath: env("CLIENT_VERIFY_EMAIL_URL", ""),
+			},
+		},
+		DB: DataBase{
+			Driver:  env("DB_DRIVER", "postgres"),
+			Host:    env("DB_HOST", ""),
+			Port:    env("DB_PORT", ""),
+			User:    env("DB_USER", ""),
+			Pass:    env("DB_PASS", ""),
+			Name:    env("DB_NAME", ""),
+			SSLMode: env("DB_SSLMODE", "disable"),
+		},
+		Redis: Redis{
+			Addr:     env("REDIS_ADDR", "localhost:6379"),
+			Password: env("REDIS_PASSWORD", ""),
+			DB:       redisDB,
+		},
+		JWT: JWT{
+			Secret:  env("JWT_SECRET", ""),
+			Issuer:  env("JWT_ISSUER", ""),
+			JWKSUrl: env("JWT_JWKS_URL", ""),
+		},
+		Mailer: SMTP{
+			Host: env("SMTP_HOST", ""),
+			Port: env("SMTP_PORT", "587"),
+			User: env("SMTP_USER", ""),
+			Pass: env("SMTP_PASS", ""),
+			From: env("SMTP_FROM", ""),
+		},
 	}
 
-	if cfg.AppEnv == "production" && cfg.DBSSLMode == "disable" {
+	if err := validator.Validate(&cfg); err != nil {
+		return nil, fmt.Errorf("config validation returned error: %v", err)
+	}
+
+	if cfg.App.Env == "production" && cfg.DB.SSLMode == "disable" {
 		return nil, fmt.Errorf("DB_SSLMODE=disable é proibido em production")
 	}
-	if cfg.JWTSecret == "" {
-		return nil, fmt.Errorf("JWT_SECRET é obrigatório")
-	}
-	if cfg.APIKey == "" {
-		return nil, fmt.Errorf("API_KEY é obrigatório")
-	}
 
-	return cfg, nil
-}
-
-func (c *Config) DSN() string {
-	return fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s TimeZone=America/Sao_Paulo",
-		c.DBHost, c.DBPort, c.DBUser, c.DBPass, c.DBName, c.DBSSLMode,
-	)
+	return &cfg, nil
 }
 
 func env(key, fallback string) string {
@@ -101,4 +127,31 @@ func env(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func (d *DataBase) DSN() string {
+	switch d.Driver {
+	case "postgres":
+		return fmt.Sprintf(
+			"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s TimeZone=America/Sao_Paulo",
+			d.Host, d.Port, d.User, d.Pass, d.Name, d.SSLMode,
+		)
+	default:
+		return ""
+	}
+}
+
+func (a *App) ClientUrl() string {
+	if _, err := strconv.Atoi(a.Frontend.Port); err != nil {
+		return fmt.Sprintf("%s", a.Frontend.HostName)
+	}
+	return fmt.Sprintf("%s:%s", a.Frontend.HostName, a.Frontend.Port)
+}
+
+func (a *App) VerifyEmailUrl(token string) string {
+	cliUrl := a.ClientUrl()
+	if !strings.HasPrefix(a.Frontend.VerifyUserEmailPath, "/") {
+		return fmt.Sprintf("%s/%s?token=%s", cliUrl, a.Frontend.VerifyUserEmailPath, token)
+	}
+	return fmt.Sprintf("%s%s?token=%s", cliUrl, a.Frontend.VerifyUserEmailPath, token)
 }

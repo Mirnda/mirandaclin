@@ -35,7 +35,7 @@ type handlers struct {
 func registerRoutes(mux *http.ServeMux, h handlers, cfg *config.Config, c cache.Cache, log logger.Logger) http.Handler {
 	publicRL := middleware.RateLimit(c, 10, time.Minute)
 
-	authMw := middleware.Auth(cfg.JWTSecret)
+	authMw := middleware.Auth(cfg.JWT.Secret)
 
 	generalRL := middleware.RateLimit(c, 120, time.Minute)
 	protect := func(handler http.Handler) http.Handler {
@@ -53,7 +53,7 @@ func registerRoutes(mux *http.ServeMux, h handlers, cfg *config.Config, c cache.
 	}
 
 	// Swagger — disponível apenas fora de produção
-	if cfg.AppEnv != "production" {
+	if cfg.App.Env != "production" {
 		mux.Handle("GET /swagger/", httpSwagger.Handler(
 			httpSwagger.URL("/swagger/doc.json"),
 		))
@@ -112,8 +112,8 @@ func registerRoutes(mux *http.ServeMux, h handlers, cfg *config.Config, c cache.
 	// Stack global: RequestID → RequestLogger → SecurityHeaders → CORS → Metrics → rotas
 	return middleware.RequestID(
 		middleware.RequestLogger(log)(
-			middleware.SecurityHeaders(cfg.AppEnv)(
-				middleware.CORS(cfg.CORSAllowedOrigins)(
+			middleware.SecurityHeaders(cfg.App.Env)(
+				middleware.CORS(cfg.App.CORSAllowedOrigins)(
 					middleware.Metrics(mux),
 				),
 			),

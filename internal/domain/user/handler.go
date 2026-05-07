@@ -3,10 +3,8 @@ package user
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 
-	emailverification "github.com/Mirnda/mirandaclin/internal/domain/email_verification"
 	"github.com/Mirnda/mirandaclin/internal/domain/invite"
 	"github.com/Mirnda/mirandaclin/pkg/logger"
 	"github.com/Mirnda/mirandaclin/pkg/response"
@@ -22,17 +20,17 @@ func NewHandler(svc *Service, appEnv string) *Handler {
 	return &Handler{svc: svc, appEnv: appEnv}
 }
 
-type registerRequest struct {
-	TenantName            string `json:"tenant_name"`
-	Email                 string `json:"email"                   validate:"required,email"`
-	Password              string `json:"password"                validate:"required,min=8"`
-	FullName              string `json:"full_name"               validate:"required"`
-	Document              string `json:"document"`
-	Phone                 string `json:"phone"`
-	HasWhatsapp           bool   `json:"has_whatsapp"`
-	EmergencyContactName  string `json:"emergency_contact_name"`
-	EmergencyContactPhone string `json:"emergency_contact_phone"`
-}
+// type registerRequest struct {
+// 	TenantName            string `json:"tenant_name"`
+// 	Email                 string `json:"email"                   validate:"required,email"`
+// 	Password              string `json:"password"                validate:"required,min=8"`
+// 	FullName              string `json:"full_name"               validate:"required"`
+// 	Document              string `json:"document"`
+// 	Phone                 string `json:"phone"`
+// 	HasWhatsapp           bool   `json:"has_whatsapp"`
+// 	EmergencyContactName  string `json:"emergency_contact_name"`
+// 	EmergencyContactPhone string `json:"emergency_contact_phone"`
+// }
 
 // type createUserRequest struct {
 // 	Email                 string `json:"email"                  validate:"required,email"`
@@ -75,51 +73,52 @@ type registerRequest struct {
 // }
 
 type acceptInviteRequest struct {
-	Token string `json:"token" validate:"required"`
+	Token    string `json:"token"    validate:"required"`
+	Password string `json:"password" validate:"required,min=8"`
 }
 
-// @Summary     Registro de nova clínica (cria tenant + usuário admin)
-// @Tags        auth
-// @Accept      json
-// @Produce     json
-// @Param       body body registerRequest true "Dados do registro"
-// @Success     201 {object} response.Response{data=map[string]string}
-// @Failure     400 {object} response.Response
-// @Failure     409 {object} response.Response
-// @Router      /v1/api/auth/register [post]
-func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	log := logger.FromContext(ctx)
+// // @Summary     Registro de nova clínica (cria tenant + usuário admin)
+// // @Tags        auth
+// // @Accept      json
+// // @Produce     json
+// // @Param       body body registerRequest true "Dados do registro"
+// // @Success     201 {object} response.Response{data=map[string]string}
+// // @Failure     400 {object} response.Response
+// // @Failure     409 {object} response.Response
+// // @Router      /v1/api/auth/register [post]
+// func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
+// 	ctx := r.Context()
+// 	log := logger.FromContext(ctx)
 
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
-	var req registerRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.WithField(logger.Err(err)).Warn("payload inválido")
-		response.Error(w, http.StatusBadRequest, "payload inválido")
-		return
-	}
-	if errs := validator.Validate(req); errs != nil {
-		log.WithField(logger.String("validate", fmt.Sprintf("%#v", errs))).Warn("dados inválidos")
-		response.Error(w, http.StatusBadRequest, "dados inválidos")
-		return
-	}
+// 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+// 	var req registerRequest
+// 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+// 		log.WithField(logger.Err(err)).Warn("payload inválido")
+// 		response.Error(w, http.StatusBadRequest, "payload inválido")
+// 		return
+// 	}
+// 	if errs := validator.Validate(req); errs != nil {
+// 		log.WithField(logger.String("validate", fmt.Sprintf("%#v", errs))).Warn("dados inválidos")
+// 		response.Error(w, http.StatusBadRequest, "dados inválidos")
+// 		return
+// 	}
 
-	err := h.svc.Register(ctx, RegisterRequest(req))
-	if errors.Is(err, ErrEmailConflict) {
-		response.Error(w, http.StatusConflict, err.Error())
-		return
-	}
-	if errors.Is(err, ErrTenantConflict) {
-		response.Error(w, http.StatusConflict, err.Error())
-		return
-	}
-	if err != nil {
-		log.Error("erro ao registrar usuário", logger.Err(err))
-		response.Error(w, http.StatusInternalServerError, "erro interno")
-		return
-	}
-	response.Created(w, "usuário registrado com sucesso", map[string]string{"message": "verifique seu e-mail"})
-}
+// 	err := h.svc.Register(ctx, RegisterRequest(req))
+// 	if errors.Is(err, ErrEmailConflict) {
+// 		response.Error(w, http.StatusConflict, err.Error())
+// 		return
+// 	}
+// 	if errors.Is(err, ErrTenantConflict) {
+// 		response.Error(w, http.StatusConflict, err.Error())
+// 		return
+// 	}
+// 	if err != nil {
+// 		log.Error("erro ao registrar usuário", logger.Err(err))
+// 		response.Error(w, http.StatusInternalServerError, "erro interno")
+// 		return
+// 	}
+// 	response.Created(w, "usuário registrado com sucesso", map[string]string{"message": "verifique seu e-mail"})
+// }
 
 // // @Summary     Criar usuário staff no tenant (admin, dentist, secretary)
 // // @Tags        users
@@ -196,13 +195,12 @@ func (h *Handler) AcceptInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.svc.AcceptInvite(r.Context(), AcceptInviteRequest(req))
+	loginResp, err := h.svc.AcceptInvite(r.Context(), AcceptInviteRequest{
+		Token:    req.Token,
+		Password: req.Password,
+	})
 	if errors.Is(err, invite.ErrInvalidInvite) {
 		response.Error(w, http.StatusUnprocessableEntity, "convite inválido ou expirado")
-		return
-	}
-	if errors.Is(err, ErrEmailConflict) {
-		response.Error(w, http.StatusConflict, err.Error())
 		return
 	}
 	if err != nil {
@@ -210,7 +208,11 @@ func (h *Handler) AcceptInvite(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusInternalServerError, "erro interno")
 		return
 	}
-	response.Created(w, "cadastro realizado com sucesso", map[string]string{"token": token})
+	http.SetCookie(w, loginResp.RefreshCookie)
+	response.Created(w, "cadastro realizado com sucesso", map[string]any{
+		"token":      loginResp.AccessToken,
+		"expires_at": loginResp.AccessExpirationTime,
+	})
 }
 
 // @Summary     Verificar email
@@ -232,7 +234,7 @@ func (h *Handler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err := h.svc.VerifyEmail(ctx, token)
-	if errors.Is(err, emailverification.ErrInvalidToken) {
+	if errors.Is(err, ErrInvalidToken) {
 		log.Error("erro ao verificar email", logger.Err(err))
 		response.Error(w, http.StatusUnprocessableEntity, "token inválido ou expirado")
 		return

@@ -62,6 +62,11 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 			response.Error(w, http.StatusForbidden, ErrTenantForbidden.Error())
 			return
 		}
+		if errors.Is(err, ErrUserNotVerified) {
+			log.WithErr(err).With("email", req.Email).Debug("verify email is required")
+			response.Error(w, http.StatusUnauthorized, "usuário não confirmou email")
+			return
+		}
 
 		log.WithErr(err).Warn("internal error")
 		response.Error(w, http.StatusInternalServerError, "erro interno")

@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS invites (
     id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id     UUID        NOT NULL,
+    tenant_id     UUID        NOT NULL REFERENCES tenants(id),
+    user_id       UUID        NOT NULL REFERENCES users(id),
     token         TEXT        NOT NULL,
     email         TEXT        NOT NULL DEFAULT '',
     role          TEXT        NOT NULL DEFAULT '',

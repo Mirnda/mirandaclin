@@ -37,11 +37,11 @@ func main() {
 		panic(fmt.Sprintf("config inválida: %v", err))
 	}
 
-	log := logger.New(cfg.AppEnv)
+	log := logger.New(cfg.App.Env)
 	defer func() { _ = log.Sync() }()
 
 	// Banco de dados
-	db, err := infraDB.New(cfg.DSN())
+	db, err := infraDB.New(cfg.DB.DSN())
 	if err != nil {
 		log.Error("falha ao conectar banco", logger.Err(err))
 		panic(err)
@@ -52,7 +52,7 @@ func main() {
 	}
 
 	// Cache
-	cache, err := infraCache.NewRedis(cfg.RedisAddr, cfg.RedisPassword, cfg.RedisDB)
+	cache, err := infraCache.NewRedis(cfg.Redis.Addr, cfg.Redis.Password, cfg.Redis.DB)
 	if err != nil {
 		log.Warn("Redis indisponível — usando Noop cache", logger.Err(err))
 		cache = infraCache.NewNoop()
@@ -63,7 +63,6 @@ func main() {
 	profileRepo := repository.NewProfileRepository()
 	inviteRepo := repository.NewInviteRepository()
 	tenantRepo := repository.NewTenantRepository()
-	emailVerifRepo := repository.NewEmailVerificationRepository()
 	clinicRepo := repository.NewClinicRepository()
 	dcRepo := repository.NewDentistClinicRepository()
 	blockRepo := repository.NewDentistBlockRepository()
@@ -71,23 +70,18 @@ func main() {
 	consultRepo := repository.NewConsultationRepository()
 
 	// Mailer
-	var ml mailer.Mailer
-	if cfg.SMTPHost != "" {
-		ml = mailer.NewSMTP(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPass, cfg.SMTPFrom)
-	} else {
-		ml = mailer.NewNoop()
-	}
+	ml := mailer.New(cfg.Mailer)
 
 	// Services
-	userSvc := user.NewService(db, userRepo, profileRepo, inviteRepo, tenantRepo, emailVerifRepo, ml, cache, cfg.JWTSecret, cfg.AppURL)
-	inviteSvc := invite.NewService(db, inviteRepo, ml, cfg.AppURL)
+	userSvc := user.NewService(db, userRepo, profileRepo, inviteRepo, tenantRepo, cfg.App, ml, cache, cfg.JWT.Secret)
+	inviteSvc := invite.NewService(db, inviteRepo, profileRepo, ml, cfg.App)
 	clinicSvc := clinic.NewService(db, clinicRepo)
 	apptSvc := appointment.NewService(db, apptRepo, dcRepo, blockRepo)
 	consultSvc := consultation.NewService(db, consultRepo)
 
 	// Handlers
 	h := handlers{
-		user:         user.NewHandler(userSvc, cfg.AppEnv),
+		user:         user.NewHandler(userSvc, cfg.App.Env),
 		invite:       invite.NewHandler(inviteSvc),
 		clinic:       clinic.NewHandler(clinicSvc),
 		appointment:  appointment.NewHandler(apptSvc),
@@ -99,7 +93,7 @@ func main() {
 	mux := http.NewServeMux()
 	handler := registerRoutes(mux, h, cfg, cache, log)
 
-	addr := ":" + cfg.AppPort
+	addr := ":" + cfg.App.Port
 	log.Info("servidor iniciando", logger.String("addr", addr))
 
 	srv := &http.Server{

@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -13,7 +14,14 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var ErrUnexpectedAlgorithm = fmt.Errorf("algoritmo inesperado")
+var (
+	ErrInvalidCreds    = errors.New("credenciais inválidas")
+	ErrUserNotVerified = errors.New("usuário não confirmou email")
+	ErrTenantRequired  = errors.New("informe o tenant_id para autenticar")
+	ErrTenantForbidden = errors.New("usuário não pertence a este tenant")
+
+	ErrUnexpectedAlgorithm = errors.New("algoritmo inesperado")
+)
 
 const defaultTokenDuration time.Duration = 15 * time.Minute
 
@@ -46,7 +54,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 
 	log = log.With("user_id", u.ID.String())
 
-	if u.EmailVerifiedAt.IsZero() || u.EmailVerifiedAt.After(time.Now()) {
+	if u.EmailVerifiedAt == nil || u.EmailVerifiedAt.IsZero() || u.EmailVerifiedAt.After(time.Now()) {
 		log.WithErr(ErrUserNotVerified).Warn("not allowed to log in before email confirmation")
 		return nil, ErrUserNotVerified
 	}
@@ -126,7 +134,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 		return nil, err
 	}
 
-	refreshCookie := s.generateRefreshCookie(refreshToken, s.appURL == "production", refreshExpiresAt)
+	refreshCookie := s.generateRefreshCookie(refreshToken, s.cfg.Env == "production", refreshExpiresAt)
 
 	response := LoginResponse{
 		AccessToken:          accessToken,
