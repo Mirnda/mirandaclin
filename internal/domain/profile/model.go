@@ -1,11 +1,17 @@
 package profile
 
 import (
+	"errors"
 	"time"
 
 	"github.com/Mirnda/mirandaclin/internal/domain/shared"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+)
+
+var (
+	ErrTenantRequired = errors.New("informe o tenant_id")
+	ErrNameRequired   = errors.New("informe o nome")
 )
 
 type Profile struct {
@@ -29,6 +35,12 @@ type Profile struct {
 func (p *Profile) BeforeCreate(_ *gorm.DB) error {
 	if p.ID == uuid.Nil {
 		p.ID = uuid.New()
+	}
+	if p.TenantID == uuid.Nil {
+		return ErrTenantRequired
+	}
+	if p.FullName == "" {
+		return ErrNameRequired
 	}
 	return nil
 }

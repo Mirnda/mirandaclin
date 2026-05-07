@@ -178,8 +178,10 @@ func (s *Service) invalidatePatientCache(ctx context.Context, tenantID uuid.UUID
 		log.WithErr(err).Warn("failed to remove patients from cache")
 	}
 
-	keyPrefix, errDelPrefix := s.cache.DelWithPrefix(ctx, fmt.Sprintf("%s:patients:*", tenantID))
+	keyPrefix, err := s.cache.DelWithPrefix(ctx, fmt.Sprintf("%s:patients:*", tenantID))
+	if err != nil {
+		log.WithErr(err).Warn("failed to remove patients.search from cache")
+	}
 
-	log.WithField(logger.String("err errDelPrefix", errDelPrefix.Error())).
-		WithField(logger.String("keyPrefix", fmt.Sprintf("%v", keyPrefix))).Info("invalidatePatientCache")
+	log.WithField(logger.String("keyPrefix", fmt.Sprintf("%v", keyPrefix))).Info("invalidatePatientCache")
 }

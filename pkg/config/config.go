@@ -20,7 +20,7 @@ type Config struct {
 type App struct {
 	Name     string `json:"name" validate:"required"`
 	Env      string `json:"env" validate:"required,oneof=production staging development"`
-	HostName string `json:"host" validate:"required,hostname|ip"`
+	HostName string `json:"host" validate:"required,url|hostname|ip"`
 	Port     string `json:"port" validate:"required"`
 
 	RateLimitEnabled   bool   `json:"rate_limit_enabled" validate:"required"`
@@ -30,7 +30,7 @@ type App struct {
 }
 
 type Client struct {
-	HostName            string `json:"host" validate:"required,hostname|ip"`
+	HostName            string `json:"host" validate:"required,url|hostname|ip"`
 	Port                string `json:"port" validate:"required"`
 	VerifyUserEmailPath string `json:"verify_email_url_path" validate:"required"`
 }
