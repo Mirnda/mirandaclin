@@ -5,13 +5,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
-	"strings"
-	"time"
 
-	"github.com/Mirnda/mirandaclin/internal/domain/invite"
-	"github.com/Mirnda/mirandaclin/internal/domain/profile"
 	"github.com/Mirnda/mirandaclin/internal/domain/shared"
-	"github.com/Mirnda/mirandaclin/pkg/logger"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
@@ -23,84 +18,6 @@ var (
 	ErrEmailConflict = errors.New("email já cadastrado")
 	ErrUserNotFound  = errors.New("usuário não encontrado")
 )
-
-// Create adiciona um novo usuário (staff) a um tenant existente.
-// Rejeita role=patient — pacientes são criados via CreatePatient.
-func (s *Service) Create(ctx context.Context, req CreateRequest) (*UserWithProfile, error) {
-	if req.Role == shared.RolePatient {
-		return nil, ErrInvalidRole
-	}
-
-	existing, err := s.userRepo.FindByEmail(ctx, s.db, req.Email)
-	if err != nil {
-		return nil, err
-	}
-	if existing != nil {
-		return nil, ErrEmailConflict
-	}
-
-	salt, hash, err := hashPassword(req.Password)
-	if err != nil {
-		return nil, err
-	}
-
-	verifyToken, err := generateToken(tokenDefaultLength, tokenDefaultOnlyNumbers)
-	if err != nil {
-		return nil, err
-	}
-
-	u := &User{
-		Email:        req.Email,
-		PasswordHash: hash,
-		Salt:         salt,
-		LastTenantID: req.TenantID,
-	}
-	p := &profile.Profile{
-		TenantID:              req.TenantID,
-		Role:                  req.Role,
-		FullName:              req.FullName,
-		Document:              req.Document,
-		Phone:                 req.Phone,
-		HasWhatsapp:           req.HasWhatsapp,
-		EmergencyContactName:  req.EmergencyContactName,
-		EmergencyContactPhone: req.EmergencyContactPhone,
-	}
-	inv := &invite.Invite{
-		TenantID:  req.TenantID,
-		Token:     verifyToken,
-		Email:     req.Email,
-		Role:      req.Role,
-		EventId:   logger.GetRequestID(ctx),
-		CreatedAt: time.Now(),
-		ExpiresAt: time.Now().Add(24 * time.Hour),
-	}
-
-	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := s.userRepo.Create(ctx, tx, u); err != nil {
-			return err
-		}
-		p.UserID = &u.ID
-		if err := s.profileRepo.Create(ctx, tx, p); err != nil {
-			return err
-		}
-		inv.UserID = &u.ID
-		return s.inviteRepo.Create(ctx, tx, inv)
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	uName := p.FullName
-	parts := strings.Fields(uName)
-	if len(parts) > 0 {
-		uName = parts[0]
-		if len(parts[0]) < 5 && len(parts) > 1 {
-			uName = strings.Join(parts[:2], " ")
-		}
-	}
-
-	return mergeUserProfile(u, p), s.sendVerificationEmail(ctx, s.cfg.Name, uName, req.Email, verifyToken, s.cfg.VerifyEmailUrl(verifyToken))
-}
 
 // List retorna todos os usuários staff (não pacientes) do tenant.
 func (s *Service) List(ctx context.Context, tenantID uuid.UUID) ([]UserWithProfile, error) {
@@ -140,6 +57,16 @@ func (s *Service) GetByID(ctx context.Context, tenantID, id uuid.UUID) (*UserWit
 		return nil, ErrUserNotFound
 	}
 	return mergeUserProfile(u, p), nil
+}
+
+type UpdateRequest struct {
+	FullName              string
+	Phone                 string
+	Document              string
+	HasWhatsapp           bool
+	EmergencyContactName  string
+	EmergencyContactPhone string
+	Password              string
 }
 
 func (s *Service) Update(ctx context.Context, tenantID, userID uuid.UUID, req UpdateRequest) (*UserWithProfile, error) {

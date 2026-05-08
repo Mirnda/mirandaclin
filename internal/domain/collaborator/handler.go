@@ -63,7 +63,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	tenantID := middleware.TenantFromContext(ctx)
 	collaborator, err := h.svc.Create(ctx, CreateCollaboratorRequest{
-		CreateProfileRequest: profile.CreateProfileRequest{
+		CreateProfile: profile.CreateProfile{
 			TenantID:              tenantID,
 			FullName:              req.FullName,
 			Document:              req.Document,
@@ -97,10 +97,9 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	log := logger.FromContext(ctx)
 	tenantID := middleware.TenantFromContext(ctx)
 
-	log.Debug("init LIST COLLABORATORS")
 	collaborators, err := h.svc.List(ctx, tenantID)
 	if err != nil {
-		log.WithErr(err).Error("failed to list users")
+		log.WithErr(err).Warn("failed to list users")
 		response.Error(w, http.StatusInternalServerError, "erro interno")
 		return
 	}

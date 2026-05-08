@@ -8,9 +8,9 @@ import (
 )
 
 const (
-	StatusScheduled  = "scheduled"
-	StatusCompleted  = "completed"
-	StatusCancelled  = "cancelled"
+	StatusScheduled = "scheduled"
+	StatusCompleted = "completed"
+	StatusCancelled = "cancelled"
 )
 
 type Appointment struct {
@@ -19,7 +19,7 @@ type Appointment struct {
 	PatientID   uuid.UUID  `gorm:"type:uuid;not null"       json:"patient_id"`
 	DentistID   uuid.UUID  `gorm:"type:uuid;not null"       json:"dentist_id"`
 	ClinicID    uuid.UUID  `gorm:"type:uuid;not null"       json:"clinic_id"`
-	SecretaryID *uuid.UUID `gorm:"type:uuid"                json:"secretary_id,omitempty"`
+	SecretaryID uuid.UUID  `gorm:"type:uuid"                json:"secretary_id,omitempty"`
 	ScheduledAt time.Time  `gorm:"not null"                 json:"scheduled_at"`
 	CanceledAt  *time.Time `json:"canceled_at,omitempty"`
 	Status      string     `gorm:"not null;default:scheduled" json:"status"`

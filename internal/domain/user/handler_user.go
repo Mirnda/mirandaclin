@@ -11,18 +11,6 @@ import (
 	"github.com/Mirnda/mirandaclin/pkg/validator"
 )
 
-type createUserRequest struct {
-	Email                 string `json:"email"                  validate:"required,email"`
-	Password              string `json:"password"               validate:"required,min=8"`
-	Role                  string `json:"role"                   validate:"required,oneof=admin dentist secretary"`
-	Phone                 string `json:"phone"`
-	HasWhatsapp           bool   `json:"has_whatsapp"`
-	EmergencyContactName  string `json:"emergency_contact_name"`
-	EmergencyContactPhone string `json:"emergency_contact_phone"`
-	FullName              string `json:"full_name"              validate:"required"`
-	Document              string `json:"document"`
-}
-
 type updateUserRequest struct {
 	FullName              string `json:"full_name"               validate:"required"`
 	Phone                 string `json:"phone"`
@@ -31,68 +19,6 @@ type updateUserRequest struct {
 	EmergencyContactName  string `json:"emergency_contact_name"`
 	EmergencyContactPhone string `json:"emergency_contact_phone"`
 	Password              string `json:"password"`
-}
-
-// @Summary     Criar usuário staff no tenant (admin, dentist, secretary)
-// @Tags        users
-// @Security    BearerAuth
-// @Accept      json
-// @Produce     json
-// @Param       body body createUserRequest true "Dados do usuário"
-// @Success     201 {object} response.Response{data=UserWithProfile}
-// @Failure     400 {object} response.Response
-// @Failure     409 {object} response.Response
-// @Router      /v1/api/users [post]
-func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	log := logger.FromContext(ctx)
-
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
-	var req createUserRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.WithErr(err).Warn("user decode error")
-		response.Error(w, http.StatusBadRequest, "payload inválido")
-		return
-	}
-	if err := validator.Validate(req); err != nil {
-		log.WithErr(err).Warn("user validation returned an error")
-		response.Error(w, http.StatusBadRequest, "dados inválidos")
-		return
-	}
-
-	tenantID := middleware.TenantFromContext(ctx)
-	u, err := h.svc.Create(ctx, CreateRequest{
-		TenantID:              tenantID,
-		Email:                 req.Email,
-		Password:              req.Password,
-		Role:                  req.Role,
-		Phone:                 req.Phone,
-		HasWhatsapp:           req.HasWhatsapp,
-		EmergencyContactName:  req.EmergencyContactName,
-		EmergencyContactPhone: req.EmergencyContactPhone,
-		FullName:              req.FullName,
-		Document:              req.Document,
-	})
-
-	if err != nil {
-		if errors.Is(err, ErrEmailConflict) {
-			log.WithErr(err).Warn("failed to create user")
-			response.Error(w, http.StatusConflict, err.Error())
-			return
-		}
-		if errors.Is(err, ErrInvalidRole) {
-			log.WithErr(err).Warn("failed to create user")
-			response.Error(w, http.StatusBadRequest, err.Error())
-			return
-		}
-
-		log.WithErr(err).Error("failed to create user")
-		response.Error(w, http.StatusInternalServerError, "erro interno")
-		return
-	}
-
-	log.Debug("user created")
-	response.Created(w, "usuário criado com sucesso", u)
 }
 
 // @Summary     Listar usuários staff do tenant

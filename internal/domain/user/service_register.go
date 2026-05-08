@@ -13,6 +13,7 @@ import (
 
 	"github.com/Mirnda/mirandaclin/internal/domain/invite"
 	"github.com/Mirnda/mirandaclin/internal/domain/profile"
+	"github.com/Mirnda/mirandaclin/internal/domain/shared"
 	"github.com/Mirnda/mirandaclin/internal/domain/tenant"
 	"github.com/Mirnda/mirandaclin/pkg/logger"
 
@@ -29,6 +30,18 @@ var (
 	tokenDefaultLength      int64 = 6
 	tokenDefaultOnlyNumbers bool  = true
 )
+
+type RegisterRequest struct {
+	TenantName            string
+	Email                 string
+	Password              string
+	FullName              string
+	Document              string
+	Phone                 string
+	HasWhatsapp           bool
+	EmergencyContactName  string
+	EmergencyContactPhone string
+}
 
 // Register cria um novo tenant e seu primeiro usuário admin, depois envia email de confirmação.
 func (s *Service) Register(ctx context.Context, req RegisterRequest) error {
@@ -69,7 +82,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) error {
 		Salt:         salt,
 	}
 	p := &profile.Profile{
-		Role:                  RoleAdmin,
+		Role:                  shared.RoleAdmin,
 		FullName:              req.FullName,
 		Document:              req.Document,
 		Phone:                 req.Phone,
@@ -80,7 +93,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) error {
 	inv := &invite.Invite{
 		Token:        verifyToken,
 		Email:        req.Email,
-		Role:         RoleAdmin,
+		Role:         shared.RoleAdmin,
 		PasswordHash: hash,
 		Salt:         salt,
 		EventId:      logger.GetRequestID(ctx),

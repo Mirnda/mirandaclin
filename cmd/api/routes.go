@@ -7,8 +7,10 @@ import (
 	"github.com/Mirnda/mirandaclin/internal/cep"
 	"github.com/Mirnda/mirandaclin/internal/domain/appointment"
 	"github.com/Mirnda/mirandaclin/internal/domain/clinic"
+	"github.com/Mirnda/mirandaclin/internal/domain/collaborator"
 	"github.com/Mirnda/mirandaclin/internal/domain/consultation"
 	"github.com/Mirnda/mirandaclin/internal/domain/invite"
+	"github.com/Mirnda/mirandaclin/internal/domain/profile"
 	"github.com/Mirnda/mirandaclin/internal/domain/user"
 	"github.com/Mirnda/mirandaclin/internal/health"
 	"github.com/Mirnda/mirandaclin/internal/infra/cache"
@@ -24,6 +26,8 @@ import (
 type handlers struct {
 	user         *user.Handler
 	invite       *invite.Handler
+	profile      *profile.Handler
+	collaborator *collaborator.Handler
 	clinic       *clinic.Handler
 	appointment  *appointment.Handler
 	consultation *consultation.Handler
@@ -74,20 +78,30 @@ func registerRoutes(mux *http.ServeMux, h handlers, cfg *config.Config, c cache.
 	mux.Handle("POST /v1/api/invites", inviteProtect(http.HandlerFunc(h.invite.Create)))
 	mux.Handle("POST /v1/api/invites/accept", publicRL(http.HandlerFunc(h.user.AcceptInvite)))
 
-	// Patients — profiles sem User vinculado (role=patient)
-	mux.Handle("POST /v1/api/patients", protect(http.HandlerFunc(h.user.CreatePatient)))
-	mux.Handle("GET /v1/api/patients", protect(http.HandlerFunc(h.user.ListPatients)))
-	mux.Handle("GET /v1/api/patients/search", protect(http.HandlerFunc(h.user.SearchPatients)))
-	mux.Handle("GET /v1/api/patients/{id}", protect(http.HandlerFunc(h.user.GetPatient)))
-	mux.Handle("PUT /v1/api/patients/{id}", protect(http.HandlerFunc(h.user.UpdatePatient)))
-	mux.Handle("DELETE /v1/api/patients/{id}", protect(http.HandlerFunc(h.user.DeletePatient)))
-
-	// Users (staff: admin, dentist, secretary)
-	mux.Handle("POST /v1/api/users", protect(http.HandlerFunc(h.user.Create)))
+	//Users
 	mux.Handle("GET /v1/api/users", protect(http.HandlerFunc(h.user.List)))
 	mux.Handle("GET /v1/api/users/{id}", protect(http.HandlerFunc(h.user.GetByID)))
 	mux.Handle("PUT /v1/api/users/{id}", protect(http.HandlerFunc(h.user.Update)))
 	mux.Handle("DELETE /v1/api/users/{id}", protect(http.HandlerFunc(h.user.Delete)))
+
+	//Collaborators
+	mux.Handle("POST /v1/api/collaborators", protect(http.HandlerFunc(h.collaborator.Create)))
+	mux.Handle("GET /v1/api/collaborators", protect(http.HandlerFunc(h.collaborator.List)))
+
+	// Patients — profiles sem User vinculado (role=patient)
+	// mux.Handle("POST /v1/api/patients", protect(http.HandlerFunc(h.user.CreatePatient)))
+	// mux.Handle("GET /v1/api/patients", protect(http.HandlerFunc(h.user.ListPatients)))
+	// mux.Handle("GET /v1/api/patients/search", protect(http.HandlerFunc(h.user.SearchPatients)))
+	// mux.Handle("GET /v1/api/patients/{id}", protect(http.HandlerFunc(h.user.GetPatient)))
+	// mux.Handle("PUT /v1/api/patients/{id}", protect(http.HandlerFunc(h.user.UpdatePatient)))
+	// mux.Handle("DELETE /v1/api/patients/{id}", protect(http.HandlerFunc(h.user.DeletePatient)))
+
+	//Profiles
+	mux.Handle("POST /v1/api/profiles", protect(http.HandlerFunc(h.profile.Create)))
+	mux.Handle("GET /v1/api/profiles/role/{role}", protect(http.HandlerFunc(h.profile.ListByRole)))
+	mux.Handle("GET /v1/api/profiles/{id}", protect(http.HandlerFunc(h.profile.GetByID)))
+	mux.Handle("PUT /v1/api/profiles/{id}", protect(http.HandlerFunc(h.profile.Update)))
+	mux.Handle("DELETE /v1/api/profiles/{id}", protect(http.HandlerFunc(h.profile.Delete)))
 
 	// Clinics
 	mux.Handle("POST /v1/api/clinics", protect(http.HandlerFunc(h.clinic.Create)))

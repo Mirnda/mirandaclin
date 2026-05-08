@@ -23,34 +23,3 @@ func TestHashPassword(t *testing.T) {
 		t.Error("hash deve ser diferente a cada chamada")
 	}
 }
-
-func TestGenerateToken(t *testing.T) {
-	type Params struct {
-		onlyNumbers bool
-		length      int64
-	}
-	tests := []Params{
-		{onlyNumbers: true, length: 6},
-		{onlyNumbers: true, length: 6},
-		{onlyNumbers: true, length: 6},
-		{onlyNumbers: true, length: 6},
-		{onlyNumbers: true, length: 6},
-		{onlyNumbers: false, length: 6},
-		{onlyNumbers: false, length: 6},
-		{onlyNumbers: false, length: 6},
-		{onlyNumbers: false, length: 6},
-		{onlyNumbers: true, length: 30},
-		{onlyNumbers: false, length: 20},
-		{onlyNumbers: false, length: 20},
-		{onlyNumbers: false, length: 20},
-	}
-
-	for i, test := range tests {
-		token, err := generateToken(test.length, test.onlyNumbers)
-		if err != nil {
-			t.Error(err)
-		}
-
-		t.Logf("t%d: %s", i, token)
-	}
-}

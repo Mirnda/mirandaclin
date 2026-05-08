@@ -18,13 +18,13 @@ type Address struct {
 // campo ausente (nil) de campo presente mas vazio (""), permitindo validate:"required".
 type AddressInput struct {
 	PostalCode   *string `json:"postal_code" validate:"required"`
-	Street       *string `json:"street" validate:"required"`
-	Number       *string `json:"number" validate:"required"`
+	Street       *string `json:"street"`
+	Number       *string `json:"number"`
 	Complement   *string `json:"complement"`
 	Neighborhood *string `json:"neighborhood"`
 	City         *string `json:"city" validate:"required"`
 	State        *string `json:"state" validate:"required,min=2"`
-	Country      *string `json:"country" validate:"required"`
+	Country      *string `json:"country"`
 	Latitude     *string `json:"latitude"`
 	Longitude    *string `json:"longitude"`
 }

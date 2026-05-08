@@ -1,6 +1,8 @@
 package middleware
 
-import "github.com/google/uuid"
+import (
+	"github.com/google/uuid"
+)
 
 type contextKey string
 

@@ -1,7 +1,6 @@
 package profile
 
 import (
-	"errors"
 	"time"
 
 	"github.com/Mirnda/mirandaclin/internal/domain/shared"
@@ -9,27 +8,22 @@ import (
 	"gorm.io/gorm"
 )
 
-var (
-	ErrTenantRequired = errors.New("informe o tenant_id")
-	ErrNameRequired   = errors.New("informe o nome")
-)
-
 type Profile struct {
-	ID                    uuid.UUID      `gorm:"type:uuid;primaryKey"                                            json:"id"`
-	UserID                *uuid.UUID     `gorm:"type:uuid"                                                       json:"user_id,omitempty"`
-	TenantID              uuid.UUID      `gorm:"type:uuid;not null;index"                                        json:"tenant_id"`
-	Role                  string         `gorm:"not null"                                                        json:"role"`
+	ID                    uuid.UUID      `gorm:"type:uuid;primaryKey"             json:"id"`
+	UserID                *uuid.UUID     `gorm:"type:uuid"                        json:"user_id,omitempty"`
+	TenantID              uuid.UUID      `gorm:"type:uuid;not null;index"         json:"tenant_id"`
+	Role                  string         `gorm:"not null"                         json:"role"`
 	FullName              string         `json:"full_name"`
 	Document              string         `json:"document"`
 	BirthDate             *time.Time     `json:"birth_date,omitempty"`
 	Phone                 string         `json:"phone"`
-	HasWhatsapp           bool           `gorm:"default:false"                                                   json:"has_whatsapp"`
+	HasWhatsapp           bool           `gorm:"default:false"                    json:"has_whatsapp"`
 	EmergencyContactName  string         `json:"emergency_contact_name"`
 	EmergencyContactPhone string         `json:"emergency_contact_phone"`
-	Address               shared.Address `gorm:"embedded;embeddedPrefix:address_"                                json:"address"`
+	Address               shared.Address `gorm:"embedded;embeddedPrefix:address_" json:"address"`
 	CreatedAt             time.Time      `json:"created_at"`
 	UpdatedAt             time.Time      `json:"updated_at"`
-	DeletedAt             gorm.DeletedAt `gorm:"index"                                                           json:"-"`
+	DeletedAt             gorm.DeletedAt `gorm:"index"                            json:"-"`
 }
 
 func (p *Profile) BeforeCreate(_ *gorm.DB) error {
@@ -37,10 +31,69 @@ func (p *Profile) BeforeCreate(_ *gorm.DB) error {
 		p.ID = uuid.New()
 	}
 	if p.TenantID == uuid.Nil {
-		return ErrTenantRequired
+		return shared.ErrTenantRequired
 	}
 	if p.FullName == "" {
-		return ErrNameRequired
+		return shared.ErrNameRequired
 	}
 	return nil
+}
+
+type CreateProfile struct {
+	TenantID              uuid.UUID
+	Role                  string
+	FullName              string
+	Document              string
+	BirthDate             *time.Time
+	Phone                 string
+	HasWhatsapp           bool
+	EmergencyContactName  string
+	EmergencyContactPhone string
+	Address               shared.Address
+}
+
+type UpdateProfile struct {
+	UserID                **uuid.UUID
+	Role                  *string
+	FullName              *string
+	Document              *string
+	BirthDate             **time.Time
+	Phone                 *string
+	HasWhatsapp           *bool
+	EmergencyContactName  *string
+	EmergencyContactPhone *string
+	Address               *shared.Address
+}
+
+func (req *UpdateProfile) UpdateToProfile(p *Profile) {
+	if req.UserID != nil {
+		p.UserID = *req.UserID
+	}
+	if req.Role != nil {
+		p.Role = *req.Role
+	}
+	if req.FullName != nil {
+		p.FullName = *req.FullName
+	}
+	if req.Document != nil {
+		p.Document = *req.Document
+	}
+	if req.BirthDate != nil {
+		p.BirthDate = *req.BirthDate
+	}
+	if req.Phone != nil {
+		p.Phone = *req.Phone
+	}
+	if req.HasWhatsapp != nil {
+		p.HasWhatsapp = *req.HasWhatsapp
+	}
+	if req.EmergencyContactName != nil {
+		p.EmergencyContactName = *req.EmergencyContactName
+	}
+	if req.EmergencyContactPhone != nil {
+		p.EmergencyContactPhone = *req.EmergencyContactPhone
+	}
+	if req.Address != nil {
+		p.Address = *req.Address
+	}
 }

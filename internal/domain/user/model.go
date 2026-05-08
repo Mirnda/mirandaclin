@@ -9,13 +9,6 @@ import (
 )
 
 const (
-	RoleAdmin     = "admin"
-	RoleDentist   = "dentist"
-	RoleSecretary = "secretary"
-	RolePatient   = "patient"
-)
-
-const (
 	ScopeAdminAll     = "admin:*"
 	ScopeDentistRead  = "dentist:read"
 	ScopeDentistWrite = "dentist:write"
@@ -64,11 +57,11 @@ type UserWithProfile struct {
 // ScopeForRole retorna os escopos JWT correspondentes ao role do usuário.
 func ScopeForRole(role string) string {
 	switch role {
-	case RoleAdmin:
+	case shared.RoleAdmin:
 		return ScopeAdminAll
-	case RoleDentist:
+	case shared.RoleDentist:
 		return ScopeDentistRead + " " + ScopeDentistWrite
-	case RolePatient:
+	case shared.RolePatient:
 		return ScopePatientRead
 	default:
 		return ""

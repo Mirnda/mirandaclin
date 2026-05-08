@@ -60,6 +60,12 @@ func Auth(secret string) func(http.Handler) http.Handler {
 				return
 			}
 
+			log = log.With("tenant_id", tenantID.String()).
+				With("logged_user_id", userID.String()).
+				With("ip", ip).
+				With("session_id", claims.ID)
+			ctx = logger.WithContext(ctx, log)
+
 			EnrichRequestLog(ctx, tenantID.String(), userID.String(), claims.ID)
 
 			ctx = context.WithValue(ctx, keyTenantID, tenantID)

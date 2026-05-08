@@ -57,6 +57,14 @@ func (r *profileRepository) List(ctx context.Context, db *gorm.DB, tenantID uuid
 	return profiles, err
 }
 
+func (r *profileRepository) ListCollaborators(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) ([]profile.Profile, error) {
+	var profiles []profile.Profile
+	err := db.WithContext(ctx).
+		Where("tenant_id = ? AND role != 'patient' AND deleted_at IS NULL", tenantID).
+		Find(&profiles).Error
+	return profiles, err
+}
+
 func (r *profileRepository) ListByRole(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, role string) ([]profile.Profile, error) {
 	var profiles []profile.Profile
 	err := db.WithContext(ctx).

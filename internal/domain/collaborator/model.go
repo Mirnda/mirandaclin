@@ -8,12 +8,12 @@ import (
 )
 
 type Collaborator struct {
-	Profile             profile.Profile
-	CollaboratorClinics []CollaboratorClinic
-	ProfileBlocks       []profileblock.ProfileBlock
+	Profile             profile.Profile             `json:"profile"`
+	CollaboratorClinics []CollaboratorClinic        `json:"collaborator_clinics"`
+	ProfileBlocks       []profileblock.ProfileBlock `json:"profile_blocks"`
 }
 
 type CollaboratorClinic struct {
-	Clinic        clinic.Clinic
-	ProfileClinic profileclinic.ProfileClinic
+	Clinic        clinic.Clinic               `json:"clinic"`
+	ProfileClinic profileclinic.ProfileClinic `json:"profile_clinic"`
 }

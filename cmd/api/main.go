@@ -16,8 +16,10 @@ import (
 	"github.com/Mirnda/mirandaclin/internal/cep"
 	"github.com/Mirnda/mirandaclin/internal/domain/appointment"
 	"github.com/Mirnda/mirandaclin/internal/domain/clinic"
+	"github.com/Mirnda/mirandaclin/internal/domain/collaborator"
 	"github.com/Mirnda/mirandaclin/internal/domain/consultation"
 	"github.com/Mirnda/mirandaclin/internal/domain/invite"
+	"github.com/Mirnda/mirandaclin/internal/domain/profile"
 	"github.com/Mirnda/mirandaclin/internal/domain/user"
 	"github.com/Mirnda/mirandaclin/internal/health"
 	infraCache "github.com/Mirnda/mirandaclin/internal/infra/cache"
@@ -64,8 +66,8 @@ func main() {
 	inviteRepo := repository.NewInviteRepository()
 	tenantRepo := repository.NewTenantRepository()
 	clinicRepo := repository.NewClinicRepository()
-	dcRepo := repository.NewDentistClinicRepository()
-	blockRepo := repository.NewDentistBlockRepository()
+	pcRepo := repository.NewProfileClinicRepository()
+	blockRepo := repository.NewProfileBlockRepository()
 	apptRepo := repository.NewAppointmentRepository()
 	consultRepo := repository.NewConsultationRepository()
 
@@ -73,16 +75,20 @@ func main() {
 	ml := mailer.New(cfg.Mailer)
 
 	// Services
-	userSvc := user.NewService(db, userRepo, profileRepo, inviteRepo, tenantRepo, cfg.App, ml, cache, cfg.JWT.Secret)
+	userSvc := user.NewService(db, userRepo, profileRepo, inviteRepo, tenantRepo, cfg.App, ml, cfg.JWT.Secret)
+	profileSvc := profile.NewService(db, cache, profileRepo)
+	collaboratorSvc := collaborator.NewService(db, cache, profileRepo, clinicRepo, pcRepo, blockRepo)
 	inviteSvc := invite.NewService(db, inviteRepo, profileRepo, ml, cfg.App)
 	clinicSvc := clinic.NewService(db, clinicRepo)
-	apptSvc := appointment.NewService(db, apptRepo, dcRepo, blockRepo)
+	apptSvc := appointment.NewService(db, apptRepo, pcRepo, blockRepo)
 	consultSvc := consultation.NewService(db, consultRepo)
 
 	// Handlers
 	h := handlers{
 		user:         user.NewHandler(userSvc, cfg.App.Env),
 		invite:       invite.NewHandler(inviteSvc),
+		profile:      profile.NewHandler(profileSvc),
+		collaborator: collaborator.NewHandler(collaboratorSvc),
 		clinic:       clinic.NewHandler(clinicSvc),
 		appointment:  appointment.NewHandler(apptSvc),
 		consultation: consultation.NewHandler(consultSvc),

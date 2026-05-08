@@ -10,7 +10,9 @@ import (
 	"github.com/Mirnda/mirandaclin/internal/domain/profile"
 	profileblock "github.com/Mirnda/mirandaclin/internal/domain/profile_block"
 	profileclinic "github.com/Mirnda/mirandaclin/internal/domain/profile_clinic"
+	"github.com/Mirnda/mirandaclin/internal/domain/shared"
 	"github.com/Mirnda/mirandaclin/internal/infra/cache"
+	"github.com/Mirnda/mirandaclin/pkg/logger"
 	"github.com/google/uuid"
 
 	"gorm.io/gorm"
@@ -30,11 +32,15 @@ func NewService(db *gorm.DB, cache cache.Cache, profileRepo profile.Repository, 
 }
 
 type CreateCollaboratorRequest struct {
-	profile.CreateProfileRequest
+	profile.CreateProfile
 	ProfileClinics []profileclinic.CreateProfileClinicRequest
 }
 
 func (s *Service) Create(ctx context.Context, req CreateCollaboratorRequest) (*Collaborator, error) {
+
+	if !shared.IsValidCollaboratorRole(req.Role) {
+		return nil, shared.ErrInvalidRole
+	}
 
 	p := &profile.Profile{
 		TenantID:              req.TenantID,
@@ -104,6 +110,9 @@ func (s *Service) Create(ctx context.Context, req CreateCollaboratorRequest) (*C
 }
 
 func (s *Service) List(ctx context.Context, tenantID uuid.UUID) ([]Collaborator, error) {
+	log := logger.FromContext(ctx)
+
+	log.Debug("init list internal/domain/collaborator/service.go:115")
 
 	var collaborators []Collaborator
 
@@ -114,19 +123,26 @@ func (s *Service) List(ctx context.Context, tenantID uuid.UUID) ([]Collaborator,
 		}
 	}
 
+	log.With("collaboratorsCacheKey", collaboratorsCacheKey).Debug("nao achou nada")
+
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		profiles, err := s.profileRepo.List(ctx, s.db, tenantID)
+
+		log.Debug("Transaction")
+
+		profiles, err := s.profileRepo.ListCollaborators(ctx, s.db, tenantID)
 		if err != nil {
+			log.WithErr(err).Debug("err ListCollaborators")
 			return err
 		}
 
 		for _, p := range profiles {
-			if p.Role == profile.RolePatient {
+			if p.Role == shared.RolePatient {
 				continue
 			}
 
 			profileclinics, err := s.pcRepo.ListByProfile(ctx, s.db, tenantID, p.ID)
 			if err != nil {
+				log.WithErr(err).Debug("err ListByProfile")
 				return err
 			}
 
@@ -136,11 +152,13 @@ func (s *Service) List(ctx context.Context, tenantID uuid.UUID) ([]Collaborator,
 			for _, pc := range profileclinics {
 				pcClinic, err := s.clinicRepo.FindByID(ctx, s.db, tenantID, pc.ClinicID)
 				if err != nil {
+					log.WithErr(err).Debug("err clinicRepo.FindByID")
 					return err
 				}
 
 				pcBlocks, err := s.blockRepo.FindBlocksForSlot(ctx, s.db, tenantID, p.ID, &pc.ClinicID, time.Time{}, "", "")
 				if err != nil {
+					log.WithErr(err).Debug("err FindBlocksForSlot")
 					return err
 				}
 				allBlocks = append(allBlocks, pcBlocks...)
@@ -153,6 +171,7 @@ func (s *Service) List(ctx context.Context, tenantID uuid.UUID) ([]Collaborator,
 
 			pBlocks, err := s.blockRepo.FindBlocksForSlot(ctx, s.db, tenantID, p.ID, nil, time.Time{}, "", "")
 			if err != nil {
+				log.WithErr(err).Debug("err pBlocks, err := s.blockRepo.FindBlocksForSlot")
 				return err
 			}
 			allBlocks = append(allBlocks, pBlocks...)
@@ -160,11 +179,13 @@ func (s *Service) List(ctx context.Context, tenantID uuid.UUID) ([]Collaborator,
 			collaborator.ProfileBlocks = profileblock.RemoveDuplicates(allBlocks)
 
 			collaborators = append(collaborators, collaborator)
+			log.Debug("colaborators fim")
 		}
 
 		return nil
 	})
 	if err != nil {
+		log.WithErr(err).Debug("fora da transaction")
 		return nil, err
 	}
 
@@ -173,6 +194,7 @@ func (s *Service) List(ctx context.Context, tenantID uuid.UUID) ([]Collaborator,
 		_ = s.cache.Set(ctx, collaboratorsCacheKey, string(data), ttl)
 	}
 
+	log.Debug("fcollaboratorsdsdsdsdssd")
 	return collaborators, nil
 }
 

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	dentistblock "github.com/Mirnda/mirandaclin/internal/domain/dentist_block"
-	dentistclinic "github.com/Mirnda/mirandaclin/internal/domain/dentist_clinic"
+	profileblock "github.com/Mirnda/mirandaclin/internal/domain/profile_block"
+	profileclinic "github.com/Mirnda/mirandaclin/internal/domain/profile_clinic"
 	"github.com/Mirnda/mirandaclin/pkg/logger"
 
 	"github.com/google/uuid"
@@ -23,10 +23,10 @@ var (
 
 type CreateRequest struct {
 	TenantID    uuid.UUID
-	PatientID   uuid.UUID
-	DentistID   uuid.UUID
+	PatientID   uuid.UUID //Profile ID role = patient
+	DentistID   uuid.UUID //Profile ID role = dentist
 	ClinicID    uuid.UUID
-	SecretaryID *uuid.UUID
+	SecretaryID uuid.UUID //Profile ID - collaborator who creates the appointment
 	ScheduledAt time.Time
 	Notes       string
 }
@@ -34,20 +34,20 @@ type CreateRequest struct {
 type Service struct {
 	db              *gorm.DB
 	appointmentRepo Repository
-	dcRepo          dentistclinic.Repository
-	blockRepo       dentistblock.Repository
+	pcRepo          profileclinic.Repository
+	blockRepo       profileblock.Repository
 }
 
-func NewService(db *gorm.DB, ar Repository, dcr dentistclinic.Repository, br dentistblock.Repository) *Service {
-	return &Service{db: db, appointmentRepo: ar, dcRepo: dcr, blockRepo: br}
+func NewService(db *gorm.DB, ar Repository, pcr profileclinic.Repository, br profileblock.Repository) *Service {
+	return &Service{db: db, appointmentRepo: ar, pcRepo: pcr, blockRepo: br}
 }
 
 func (s *Service) Create(ctx context.Context, req CreateRequest) (*Appointment, error) {
-	dc, err := s.dcRepo.FindByDentistAndClinic(ctx, s.db, req.TenantID, req.DentistID, req.ClinicID)
+	dc, err := s.pcRepo.FindByProfileAndClinic(ctx, s.db, req.TenantID, req.DentistID, req.ClinicID)
 	if err != nil {
 		return nil, err
 	}
-	if dc == nil || !dc.Active {
+	if dc == nil || !dc.DeletedAt.Time.IsZero() {
 		return nil, ErrDentistNotActive
 	}
 
@@ -121,9 +121,9 @@ func (s *Service) ListByDentist(ctx context.Context, tenantID, dentistID uuid.UU
 	return s.appointmentRepo.ListByDentist(ctx, s.db, tenantID, dentistID, date)
 }
 
-func containsDay(days []string, day string) bool {
+func containsDay(days []profileclinic.ShiftPerDay, day string) bool {
 	for _, d := range days {
-		if d == day {
+		if d.WeekDay == day {
 			return true
 		}
 	}
