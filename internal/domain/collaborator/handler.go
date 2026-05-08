@@ -37,14 +37,14 @@ type createCollaboratorRequest struct {
 }
 
 // @Summary     Criar colaborador no tenant
-// @Tags        collaborator
+// @Tags        collaborators
 // @Security    BearerAuth
 // @Accept      json
 // @Produce     json
 // @Param       body body createCollaboratorRequest true "Dados do colaborador"
 // @Success     201 {object} response.Response{data=Collaborator}
 // @Failure     400 {object} response.Response
-// @Router      /v1/api/collaborator [post]
+// @Router      /v1/api/collaborators [post]
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.FromContext(ctx)
@@ -103,7 +103,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 // @Security    BearerAuth
 // @Produce     json
 // @Success     200 {object} response.Response{data=[]Collaborator}
-// @Router      /v1/api/collaborator [get]
+// @Router      /v1/api/collaborators [get]
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.FromContext(ctx)

@@ -22,7 +22,7 @@ type registerRequest struct {
 	EmergencyContactPhone string `json:"emergency_contact_phone"`
 }
 
-// @Summary     Registro de nova clínica (cria tenant + usuário admin)
+// @Summary     Registro de usuário (cria namespace + usuário admin)
 // @Tags        auth
 // @Accept      json
 // @Produce     json

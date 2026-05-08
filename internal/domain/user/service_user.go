@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 
-	"github.com/Mirnda/mirandaclin/internal/domain/shared"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
@@ -19,26 +18,31 @@ var (
 	ErrUserNotFound  = errors.New("usuário não encontrado")
 )
 
-// List retorna todos os usuários staff (não pacientes) do tenant.
+// List retorna todos os usuários staff do tenant.
 func (s *Service) List(ctx context.Context, tenantID uuid.UUID) ([]UserWithProfile, error) {
+
 	profiles, err := s.profileRepo.List(ctx, s.db, tenantID)
 	if err != nil {
 		return nil, err
 	}
 
-	result := make([]UserWithProfile, 0, len(profiles))
+	var users []UserWithProfile
 	for i := range profiles {
 		p := &profiles[i]
-		if p.Role == shared.RolePatient || p.UserID == nil {
+		if p.UserID == nil || *p.UserID == uuid.Nil {
 			continue
 		}
+
 		u, err := s.userRepo.FindByID(ctx, s.db, *p.UserID)
-		if err != nil || u == nil {
+		if err != nil {
+			return nil, err
+		}
+		if u == nil {
 			continue
 		}
-		result = append(result, *mergeUserProfile(u, p))
+		users = append(users, *mergeUserProfile(u, p))
 	}
-	return result, nil
+	return users, nil
 }
 
 func (s *Service) GetByID(ctx context.Context, tenantID, id uuid.UUID) (*UserWithProfile, error) {

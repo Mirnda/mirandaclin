@@ -88,14 +88,6 @@ func registerRoutes(mux *http.ServeMux, h handlers, cfg *config.Config, c cache.
 	mux.Handle("POST /v1/api/collaborators", protect(http.HandlerFunc(h.collaborator.Create)))
 	mux.Handle("GET /v1/api/collaborators", protect(http.HandlerFunc(h.collaborator.List)))
 
-	// Patients — profiles sem User vinculado (role=patient)
-	// mux.Handle("POST /v1/api/patients", protect(http.HandlerFunc(h.user.CreatePatient)))
-	// mux.Handle("GET /v1/api/patients", protect(http.HandlerFunc(h.user.ListPatients)))
-	// mux.Handle("GET /v1/api/patients/search", protect(http.HandlerFunc(h.user.SearchPatients)))
-	// mux.Handle("GET /v1/api/patients/{id}", protect(http.HandlerFunc(h.user.GetPatient)))
-	// mux.Handle("PUT /v1/api/patients/{id}", protect(http.HandlerFunc(h.user.UpdatePatient)))
-	// mux.Handle("DELETE /v1/api/patients/{id}", protect(http.HandlerFunc(h.user.DeletePatient)))
-
 	//Profiles
 	mux.Handle("POST /v1/api/profiles", protect(http.HandlerFunc(h.profile.Create)))
 	mux.Handle("GET /v1/api/profiles/role/{role}", protect(http.HandlerFunc(h.profile.ListByRole)))
