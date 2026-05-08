@@ -2,6 +2,7 @@ package collaborator
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -65,6 +66,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	collaborator, err := h.svc.Create(ctx, CreateCollaboratorRequest{
 		CreateProfile: profile.CreateProfile{
 			TenantID:              tenantID,
+			Role:                  req.Role,
 			FullName:              req.FullName,
 			Document:              req.Document,
 			BirthDate:             req.BirthDate,
@@ -77,6 +79,16 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		ProfileClinics: req.ProfileClinics,
 	})
 	if err != nil {
+		if errors.Is(err, shared.ErrInvalidRole) {
+			log.WithErr(err).With("role", req.Role).Warn("invalid role")
+			response.Error(w, http.StatusBadRequest, shared.ErrInvalidRole.Error())
+			return
+		}
+		if errors.Is(err, profileclinic.ErrClinicRequired) {
+			log.WithErr(err).Warn("clinic id is required")
+			response.Error(w, http.StatusBadRequest, profileclinic.ErrClinicRequired.Error())
+			return
+		}
 		log.WithErr(err).Error("failed to create patient")
 		response.Error(w, http.StatusInternalServerError, "erro interno")
 		return
