@@ -55,7 +55,7 @@ jobs:
           host: ${{ secrets.APP_HOST }}
           username: ${{ secrets.APP_USER }}
           key: ${{ secrets.APP_KEY }}
-          source: "bin/mirandaclin"
+          source: "bin"
           target: "/home/${{ secrets.APP_USER }}/app"
 
       - name: Configure service and restart
@@ -99,6 +99,42 @@ jobs:
           envs: APP_NAME,APP_PORT,APP_ENV,APP_HOST,RATE_LIMIT_ENABLED,CORS_ALLOWED_ORIGINS,CLIENT_HOSTNAME,CLIENT_PORT,CLIENT_VERIFY_EMAIL_URL,DB_DRIVER,DB_HOST,DB_PORT,DB_USER,DB_PASS,DB_NAME,DB_SSLMODE,REDIS_ADDR,REDIS_PASSWORD,REDIS_DB,JWT_ISSUER,JWT_JWKS_URL,JWT_SECRET,SMTP_HOST,SMTP_PORT,SMTP_USER,SMTP_PASS,SMTP_FROM,GRAFANA_USER,GRAFANA_PASSWORD
 
           script: |
+            sudo mkdir -p /etc/mirandaclin
+
+            cat <<EOF | sudo tee /etc/mirandaclin/app.env
+            APP_NAME=$APP_NAME
+            APP_PORT=$APP_PORT
+            APP_ENV=$APP_ENV
+            APP_HOST=$APP_HOST
+            RATE_LIMIT_ENABLED=$RATE_LIMIT_ENABLED
+            CORS_ALLOWED_ORIGINS=$CORS_ALLOWED_ORIGINS
+            CLIENT_HOSTNAME=$CLIENT_HOSTNAME
+            CLIENT_PORT=$CLIENT_PORT
+            CLIENT_VERIFY_EMAIL_URL=$CLIENT_VERIFY_EMAIL_URL
+            DB_DRIVER=$DB_DRIVER
+            DB_HOST=$DB_HOST
+            DB_PORT=$DB_PORT
+            DB_USER=$DB_USER
+            DB_PASS=$DB_PASS
+            DB_NAME=$DB_NAME
+            DB_SSLMODE=$DB_SSLMODE
+            REDIS_ADDR=$REDIS_ADDR
+            REDIS_PASSWORD=$REDIS_PASSWORD
+            REDIS_DB=$REDIS_DB
+            JWT_ISSUER=$JWT_ISSUER
+            JWT_JWKS_URL=$JWT_JWKS_URL
+            JWT_SECRET=$JWT_SECRET
+            SMTP_HOST=$SMTP_HOST
+            SMTP_PORT=$SMTP_PORT
+            SMTP_USER=$SMTP_USER
+            SMTP_PASS=$SMTP_PASS
+            SMTP_FROM=$SMTP_FROM
+            GRAFANA_USER=$GRAFANA_USER
+            GRAFANA_PASSWORD=$GRAFANA_PASSWORD
+            EOF
+
+            sudo chmod 600 /etc/mirandaclin/app.env
+
             cat <<EOF | sudo tee /etc/systemd/system/mirandaclin.service
             [Unit]
             Description=My Go App - MirandaClin
@@ -108,7 +144,8 @@ jobs:
             Type=simple
             User=${{ secrets.APP_USER }}
             WorkingDirectory=/home/${{ secrets.APP_USER }}/app
-            ExecStart=/home/${{ secrets.APP_USER }}/app/mirandaclin
+            EnvironmentFile=/etc/mirandaclin/app.env
+            ExecStart=/home/${{ secrets.APP_USER }}/app/bin/mirandaclin
             Restart=always
             RestartSec=2
 
