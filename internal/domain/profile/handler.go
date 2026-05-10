@@ -159,16 +159,16 @@ func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 }
 
 type updateProfileRequest struct {
-	UserID                **uuid.UUID
-	Role                  *string
-	FullName              *string
-	Document              *string
-	BirthDate             **time.Time
-	Phone                 *string
-	HasWhatsapp           *bool
-	EmergencyContactName  *string
-	EmergencyContactPhone *string
-	Address               *shared.Address
+	UserID                **uuid.UUID     `json:"user_id"`
+	Role                  *string         `json:"role"`
+	FullName              *string         `json:"full_name"`
+	Document              *string         `json:"document"`
+	BirthDate             **time.Time     `json:"birth_date"`
+	Phone                 *string         `json:"phone"`
+	HasWhatsapp           *bool           `json:"has_whatsapp"`
+	EmergencyContactName  *string         `json:"emergency_contact_name"`
+	EmergencyContactPhone *string         `json:"emergency_contact_phone"`
+	Address               *shared.Address `json:"address"`
 }
 
 // @Summary     Atualizar perfil

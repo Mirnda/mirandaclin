@@ -61,6 +61,55 @@ func registerRoutes(mux *http.ServeMux, h handlers, cfg *config.Config, c cache.
 		mux.Handle("GET /swagger/", httpSwagger.Handler(
 			httpSwagger.URL("/swagger/doc.json"),
 		))
+
+		mux.Handle("GET /swagger/health/", httpSwagger.Handler(
+			httpSwagger.URL("/swagger/doc.json"),
+			httpSwagger.UIConfig(map[string]string{
+				"filter": `"health"`,
+			}),
+		))
+		mux.Handle("GET /swagger/auth/", httpSwagger.Handler(
+			httpSwagger.URL("/swagger/doc.json"),
+			httpSwagger.UIConfig(map[string]string{
+				"filter": `"auth"`,
+			}),
+		))
+		mux.Handle("GET /swagger/users/", httpSwagger.Handler(
+			httpSwagger.URL("/swagger/doc.json"),
+			httpSwagger.UIConfig(map[string]string{
+				"filter": `"users"`,
+			}),
+		))
+		mux.Handle("GET /swagger/profiles/", httpSwagger.Handler(
+			httpSwagger.URL("/swagger/doc.json"),
+			httpSwagger.UIConfig(map[string]string{
+				"filter": `"profiles"`,
+			}),
+		))
+		mux.Handle("GET /swagger/collaborators/", httpSwagger.Handler(
+			httpSwagger.URL("/swagger/doc.json"),
+			httpSwagger.UIConfig(map[string]string{
+				"filter": `"collaborators"`,
+			}),
+		))
+		mux.Handle("GET /swagger/clinics/", httpSwagger.Handler(
+			httpSwagger.URL("/swagger/doc.json"),
+			httpSwagger.UIConfig(map[string]string{
+				"filter": `"clinics"`,
+			}),
+		))
+		mux.Handle("GET /swagger/invites/", httpSwagger.Handler(
+			httpSwagger.URL("/swagger/doc.json"),
+			httpSwagger.UIConfig(map[string]string{
+				"filter": `"invites"`,
+			}),
+		))
+		mux.Handle("GET /swagger/appointments/", httpSwagger.Handler(
+			httpSwagger.URL("/swagger/doc.json"),
+			httpSwagger.UIConfig(map[string]string{
+				"filter": `"appointments"`,
+			}),
+		))
 	}
 
 	// Observabilidade — sem autenticação (proteger por Security Group na AWS)
