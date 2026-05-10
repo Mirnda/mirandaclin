@@ -73,7 +73,7 @@ func Load() (*Config, error) {
 		App: App{
 			Name:               env("APP_NAME", ""),
 			Env:                env("APP_ENV", ""),
-			HostName:           env("APP_HOSTNAME", ""),
+			HostName:           env("APP_HOST", ""),
 			Port:               env("APP_PORT", "8080"),
 			RateLimitEnabled:   rateLimitEnabled,
 			CORSAllowedOrigins: env("CORS_ALLOWED_ORIGINS", ""),
