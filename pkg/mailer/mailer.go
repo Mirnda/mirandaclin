@@ -11,7 +11,7 @@ type Mailer interface {
 }
 
 func New(cfg config.SMTP) Mailer {
-	var ml Mailer = NewNoop()
+	var ml = NewNoop()
 
 	if cfg.Host != "" {
 		ml = NewSMTP(cfg.Host, cfg.Port, cfg.User, cfg.Pass, cfg.From)

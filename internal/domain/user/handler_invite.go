@@ -26,33 +26,38 @@ type acceptInviteRequest struct {
 // @Failure     422 {object} response.Response
 // @Router      /v1/api/invites/accept [post]
 func (h *Handler) AcceptInvite(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	log := logger.FromContext(ctx)
+
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	var req acceptInviteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.WithErr(err).Warn("failed to decode invite")
 		response.Error(w, http.StatusBadRequest, "payload inválido")
 		return
 	}
 	if err := validator.Validate(req); err != nil {
+		log.WithErr(err).Warn("invite validation returned an error")
 		response.Error(w, http.StatusBadRequest, "dados inválidos")
 		return
 	}
 
-	loginResp, err := h.svc.AcceptInvite(r.Context(), AcceptInviteRequest{
-		Token:    req.Token,
-		Password: req.Password,
-	})
+	loginResp, err := h.svc.AcceptInvite(ctx, AcceptInviteRequest(req))
 	if err != nil {
 		if errors.Is(err, invite.ErrInvalidInvite) {
+			log.WithErr(err).Warn("invalid/expired invite")
 			response.Error(w, http.StatusUnprocessableEntity, "convite inválido ou expirado")
 			return
 		}
 
-		logger.FromContext(r.Context()).Error("erro ao aceitar convite", logger.Err(err))
+		log.WithErr(err).Error("failed to accept invite")
 		response.Error(w, http.StatusInternalServerError, "erro interno")
 		return
 	}
 
 	http.SetCookie(w, loginResp.RefreshCookie)
+
+	log.Debug("invite accepted")
 	response.Created(w, "cadastro realizado com sucesso", map[string]any{
 		"token":      loginResp.AccessToken,
 		"expires_at": loginResp.AccessExpirationTime,

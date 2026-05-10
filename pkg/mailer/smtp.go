@@ -31,9 +31,9 @@ func (m *smtpMailer) Send(_ context.Context, to, subject, htmlBody string) error
 
 	msg := bytes.Buffer{}
 
-	msg.WriteString(fmt.Sprintf("From: %s\r\n", m.from))
-	msg.WriteString(fmt.Sprintf("To: %s\r\n", to))
-	msg.WriteString(fmt.Sprintf("Subject: %s\r\n", subject))
+	fmt.Fprintf(&msg, "From: %s\r\n", m.from)
+	fmt.Fprintf(&msg, "To: %s\r\n", to)
+	fmt.Fprintf(&msg, "Subject: %s\r\n", subject)
 	msg.WriteString("MIME-Version: 1.0\r\n")
 	msg.WriteString("Content-Type: text/html; charset=\"UTF-8\"\r\n")
 	msg.WriteString("\r\n")

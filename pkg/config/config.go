@@ -143,7 +143,7 @@ func (d *DataBase) DSN() string {
 
 func (a *App) ClientUrl() string {
 	if _, err := strconv.Atoi(a.Frontend.Port); err != nil {
-		return fmt.Sprintf("%s", a.Frontend.HostName)
+		return a.Frontend.HostName
 	}
 	return fmt.Sprintf("%s:%s", a.Frontend.HostName, a.Frontend.Port)
 }
