@@ -73,10 +73,19 @@ jobs:
 
       - name: Create Beanstalk application version
         run: |
-          aws elasticbeanstalk create-application-version \
+          EXISTS=$(aws elasticbeanstalk describe-application-versions \
             --application-name mirandaclin \
-            --version-label ${{ env.VERSION }} \
-            --source-bundle S3Bucket=${{ secrets.EB_S3_BUCKET }},S3Key=mirandaclin-${{ env.VERSION }}.zip
+            --version-labels ${{ env.VERSION }} \
+            --query 'length(ApplicationVersions)' \
+            --output text)
+          if [ "$EXISTS" = "0" ]; then
+            aws elasticbeanstalk create-application-version \
+              --application-name mirandaclin \
+              --version-label ${{ env.VERSION }} \
+              --source-bundle S3Bucket=${{ secrets.EB_S3_BUCKET }},S3Key=mirandaclin-${{ env.VERSION }}.zip
+          else
+            echo "Version ${{ env.VERSION }} already exists, skipping creation."
+          fi
 
       - name: Sync environment variables
         env:
