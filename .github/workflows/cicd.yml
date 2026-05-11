@@ -62,7 +62,7 @@ jobs:
 
       - name: Create deployment zip
         run: |
-          VERSION=$(git rev-parse --short HEAD)
+          VERSION=$(git rev-parse --short HEAD)-${{ github.run_number }}
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           zip -r mirandaclin-$VERSION.zip bin/ Procfile .platform/ .ebextensions/
 
@@ -73,19 +73,10 @@ jobs:
 
       - name: Create Beanstalk application version
         run: |
-          EXISTS=$(aws elasticbeanstalk describe-application-versions \
+          aws elasticbeanstalk create-application-version \
             --application-name mirandaclin \
-            --version-labels ${{ env.VERSION }} \
-            --query 'length(ApplicationVersions)' \
-            --output text)
-          if [ "$EXISTS" = "0" ]; then
-            aws elasticbeanstalk create-application-version \
-              --application-name mirandaclin \
-              --version-label ${{ env.VERSION }} \
-              --source-bundle S3Bucket=${{ secrets.EB_S3_BUCKET }},S3Key=mirandaclin-${{ env.VERSION }}.zip
-          else
-            echo "Version ${{ env.VERSION }} already exists, skipping creation."
-          fi
+            --version-label ${{ env.VERSION }} \
+            --source-bundle S3Bucket=${{ secrets.EB_S3_BUCKET }},S3Key=mirandaclin-${{ env.VERSION }}.zip
 
       - name: Sync environment variables
         env:
