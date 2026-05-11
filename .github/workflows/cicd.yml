@@ -127,9 +127,19 @@ jobs:
           ], check=True)
           EOF
 
+      - name: Diagnose EB region
+        run: |
+          echo "=== Configured region: $AWS_DEFAULT_REGION ==="
+          echo "=== All EB applications in this region ==="
+          aws elasticbeanstalk describe-applications --output json | \
+            python3 -c "import sys,json; [print(a['ApplicationName']) for a in json.load(sys.stdin)['Applications']]"
+          echo "=== All EB environments in this region ==="
+          aws elasticbeanstalk describe-environments --output json | \
+            python3 -c "import sys,json; [print(e['EnvironmentName'], e['ApplicationName'], e['Status']) for e in json.load(sys.stdin)['Environments']]"
+
       - name: Wait for deployment
         run: |
-          echo "AWS_DEFAULT_REGION=$AWS_REGION"
+          echo "AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION"
           TIMEOUT=480
           INTERVAL=20
           elapsed=0
