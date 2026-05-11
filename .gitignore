@@ -31,6 +31,9 @@ go.work.sum
 docs/*.json
 docs/*.yaml
 
+# deployment artifacts
+*.zip
+
 # Editor/IDE
 # .idea/
 # .vscode/

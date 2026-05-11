@@ -39,12 +39,20 @@ jobs:
       - lint
       - test
     environment:
-      name: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
+      name: prod
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Build binary
         run: |
@@ -52,110 +60,60 @@ jobs:
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
           go build -o bin/mirandaclin ./cmd/api
 
-      - name: Copy binary to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.APP_HOST }}
-          username: ${{ secrets.APP_USER }}
-          key: ${{ secrets.APP_KEY }}
-          source: "bin"
-          target: "/home/${{ secrets.APP_USER }}/app"
+      - name: Create deployment zip
+        run: |
+          VERSION=$(git rev-parse --short HEAD)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          zip -r mirandaclin-$VERSION.zip bin/ Procfile .platform/ .ebextensions/
 
-      - name: Configure service and restart
-        uses: appleboy/ssh-action@v1.2.0
-        env:
-          APP_NAME: ${{ secrets.APP_NAME }}
-          APP_PORT: ${{ secrets.APP_PORT }}
-          APP_ENV: ${{ secrets.APP_ENV }}
-          APP_HOST: ${{ secrets.APP_HOST }}
-          RATE_LIMIT_ENABLED: ${{ secrets.RATE_LIMIT_ENABLED }}
-          CORS_ALLOWED_ORIGINS: ${{ secrets.CORS_ALLOWED_ORIGINS }}
-          CLIENT_HOSTNAME: ${{ secrets.CLIENT_HOSTNAME }}
-          CLIENT_PORT: ${{ secrets.CLIENT_PORT }}
-          CLIENT_VERIFY_EMAIL_URL: ${{ secrets.CLIENT_VERIFY_EMAIL_URL }}
-          DB_DRIVER: ${{ secrets.DB_DRIVER }}
-          DB_HOST: ${{ secrets.DB_HOST }}
-          DB_PORT: ${{ secrets.DB_PORT }}
-          DB_USER: ${{ secrets.DB_USER }}
-          DB_PASS: ${{ secrets.DB_PASS }}
-          DB_NAME: ${{ secrets.DB_NAME }}
-          DB_SSLMODE: ${{ secrets.DB_SSLMODE }}
-          REDIS_ADDR: ${{ secrets.REDIS_ADDR }}
-          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
-          REDIS_DB: ${{ secrets.REDIS_DB }}
-          JWT_ISSUER: ${{ secrets.JWT_ISSUER }}
-          JWT_JWKS_URL: ${{ secrets.JWT_JWKS_URL }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          SMTP_HOST: ${{ secrets.SMTP_HOST }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_PASS: ${{ secrets.SMTP_PASS }}
-          SMTP_FROM: ${{ secrets.SMTP_FROM }}
-          GRAFANA_USER: ${{ secrets.GRAFANA_USER }}
-          GRAFANA_PASSWORD: ${{ secrets.GRAFANA_PASSWORD }}
+      - name: Upload zip to S3
+        run: |
+          aws s3 cp mirandaclin-${{ env.VERSION }}.zip \
+            s3://${{ secrets.EB_S3_BUCKET }}/mirandaclin-${{ env.VERSION }}.zip
 
-        with:
-          host: ${{ secrets.APP_HOST }}
-          username: ${{ secrets.APP_USER }}
-          key: ${{ secrets.APP_KEY }}
+      - name: Create Beanstalk application version
+        run: |
+          aws elasticbeanstalk create-application-version \
+            --application-name mirandaclin \
+            --version-label ${{ env.VERSION }} \
+            --source-bundle S3Bucket=${{ secrets.EB_S3_BUCKET }},S3Key=mirandaclin-${{ env.VERSION }}.zip
 
-          envs: APP_NAME,APP_PORT,APP_ENV,APP_HOST,RATE_LIMIT_ENABLED,CORS_ALLOWED_ORIGINS,CLIENT_HOSTNAME,CLIENT_PORT,CLIENT_VERIFY_EMAIL_URL,DB_DRIVER,DB_HOST,DB_PORT,DB_USER,DB_PASS,DB_NAME,DB_SSLMODE,REDIS_ADDR,REDIS_PASSWORD,REDIS_DB,JWT_ISSUER,JWT_JWKS_URL,JWT_SECRET,SMTP_HOST,SMTP_PORT,SMTP_USER,SMTP_PASS,SMTP_FROM,GRAFANA_USER,GRAFANA_PASSWORD
+      - name: Sync environment variables
+        run: |
+          aws elasticbeanstalk update-environment \
+            --application-name mirandaclin \
+            --environment-name mirandaclin-prod \
+            --option-settings \
+              Namespace=aws:elasticbeanstalk:application:environment,OptionName=APP_ENV,Value=production \
+              Namespace=aws:elasticbeanstalk:application:environment,OptionName=APP_PORT,Value=8080 \
+              Namespace=aws:elasticbeanstalk:application:environment,OptionName=RATE_LIMIT_ENABLED,Value=${{ secrets.RATE_LIMIT_ENABLED }} \
+              Namespace=aws:elasticbeanstalk:application:environment,OptionName=CORS_ALLOWED_ORIGINS,Value=${{ secrets.CORS_ALLOWED_ORIGINS }} \
+              Namespace=aws:elasticbeanstalk:application:environment,OptionName=DB_HOST,Value=${{ secrets.DB_HOST }} \
+              Namespace=aws:elasticbeanstalk:application:environment,OptionName=DB_PORT,Value=${{ secrets.DB_PORT }} \
+              Namespace=aws:elasticbeanstalk:application:environment,OptionName=DB_USER,Value=${{ secrets.DB_USER }} \
+              Namespace=aws:elasticbeanstalk:application:environment,OptionName=DB_PASS,Value=${{ secrets.DB_PASS }} \
+              Namespace=aws:elasticbeanstalk:application:environment,OptionName=DB_NAME,Value=${{ secrets.DB_NAME }} \
+              Namespace=aws:elasticbeanstalk:application:environment,OptionName=DB_SSLMODE,Value=${{ secrets.DB_SSLMODE }} \
+              Namespace=aws:elasticbeanstalk:application:environment,OptionName=REDIS_ADDR,Value=${{ secrets.REDIS_ADDR }} \
+              Namespace=aws:elasticbeanstalk:application:environment,OptionName=REDIS_PASSWORD,Value=${{ secrets.REDIS_PASSWORD }} \
+              Namespace=aws:elasticbeanstalk:application:environment,OptionName=REDIS_DB,Value=${{ secrets.REDIS_DB }} \
+              Namespace=aws:elasticbeanstalk:application:environment,OptionName=JWT_SECRET,Value=${{ secrets.JWT_SECRET }} \
+              Namespace=aws:elasticbeanstalk:application:environment,OptionName=JWT_ISSUER,Value=${{ secrets.JWT_ISSUER }} \
+              Namespace=aws:elasticbeanstalk:application:environment,OptionName=SMTP_HOST,Value=${{ secrets.SMTP_HOST }} \
+              Namespace=aws:elasticbeanstalk:application:environment,OptionName=SMTP_PORT,Value=${{ secrets.SMTP_PORT }} \
+              Namespace=aws:elasticbeanstalk:application:environment,OptionName=SMTP_USER,Value=${{ secrets.SMTP_USER }} \
+              Namespace=aws:elasticbeanstalk:application:environment,OptionName=SMTP_PASS,Value=${{ secrets.SMTP_PASS }} \
+              Namespace=aws:elasticbeanstalk:application:environment,OptionName=SMTP_FROM,Value=${{ secrets.SMTP_FROM }}
 
-          script: |
-            sudo mkdir -p /etc/mirandaclin
+      - name: Deploy application version
+        run: |
+          aws elasticbeanstalk update-environment \
+            --application-name mirandaclin \
+            --environment-name mirandaclin-prod \
+            --version-label ${{ env.VERSION }}
 
-            cat <<EOF | sudo tee /etc/mirandaclin/app.env
-            APP_NAME=$APP_NAME
-            APP_PORT=$APP_PORT
-            APP_ENV=$APP_ENV
-            APP_HOST=$APP_HOST
-            RATE_LIMIT_ENABLED=$RATE_LIMIT_ENABLED
-            CORS_ALLOWED_ORIGINS=$CORS_ALLOWED_ORIGINS
-            CLIENT_HOSTNAME=$CLIENT_HOSTNAME
-            CLIENT_PORT=$CLIENT_PORT
-            CLIENT_VERIFY_EMAIL_URL=$CLIENT_VERIFY_EMAIL_URL
-            DB_DRIVER=$DB_DRIVER
-            DB_HOST=$DB_HOST
-            DB_PORT=$DB_PORT
-            DB_USER=$DB_USER
-            DB_PASS=$DB_PASS
-            DB_NAME=$DB_NAME
-            DB_SSLMODE=$DB_SSLMODE
-            REDIS_ADDR=$REDIS_ADDR
-            REDIS_PASSWORD=$REDIS_PASSWORD
-            REDIS_DB=$REDIS_DB
-            JWT_ISSUER=$JWT_ISSUER
-            JWT_JWKS_URL=$JWT_JWKS_URL
-            JWT_SECRET=$JWT_SECRET
-            SMTP_HOST=$SMTP_HOST
-            SMTP_PORT=$SMTP_PORT
-            SMTP_USER=$SMTP_USER
-            SMTP_PASS=$SMTP_PASS
-            SMTP_FROM=$SMTP_FROM
-            GRAFANA_USER=$GRAFANA_USER
-            GRAFANA_PASSWORD=$GRAFANA_PASSWORD
-            EOF
-
-            sudo chmod 600 /etc/mirandaclin/app.env
-
-            cat <<EOF | sudo tee /etc/systemd/system/mirandaclin.service
-            [Unit]
-            Description=My Go App - MirandaClin
-            After=network.target
-
-            [Service]
-            Type=simple
-            User=${{ secrets.APP_USER }}
-            WorkingDirectory=/home/${{ secrets.APP_USER }}/app
-            EnvironmentFile=/etc/mirandaclin/app.env
-            ExecStart=/home/${{ secrets.APP_USER }}/app/bin/mirandaclin
-            Restart=always
-            RestartSec=2
-
-            [Install]
-            WantedBy=multi-user.target
-            EOF
-
-            sudo systemctl daemon-reload
-            sudo systemctl enable mirandaclin
-            sudo systemctl restart mirandaclin
+      - name: Wait for deployment
+        run: |
+          aws elasticbeanstalk wait environment-updated \
+            --application-name mirandaclin \
+            --environment-name mirandaclin-prod
