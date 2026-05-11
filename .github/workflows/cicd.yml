@@ -129,7 +129,7 @@ jobs:
 
       - name: Wait for deployment
         run: |
-          echo "AWS_DEFAULT_REGION=${{ secrets.AWS_REGION }}"
+          echo "AWS_DEFAULT_REGION=$AWS_REGION"
           TIMEOUT=480
           INTERVAL=20
           elapsed=0
