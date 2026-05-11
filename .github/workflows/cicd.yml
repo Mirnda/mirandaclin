@@ -129,6 +129,29 @@ jobs:
 
       - name: Wait for deployment
         run: |
-          aws elasticbeanstalk wait environment-updated \
-            --application-name mirandaclin \
-            --environment-name mirandaclin-prod
+          TIMEOUT=360
+          INTERVAL=20
+          elapsed=0
+          while [ $elapsed -lt $TIMEOUT ]; do
+            STATUS=$(aws elasticbeanstalk describe-environments \
+              --application-name mirandaclin \
+              --environment-name mirandaclin-prod \
+              --query 'Environments[0].Status' --output text)
+            HEALTH=$(aws elasticbeanstalk describe-environments \
+              --application-name mirandaclin \
+              --environment-name mirandaclin-prod \
+              --query 'Environments[0].Health' --output text)
+            echo "Status: $STATUS | Health: $HEALTH | elapsed: ${elapsed}s"
+            if [ "$STATUS" = "Ready" ] && [ "$HEALTH" = "Green" ]; then
+              echo "Deployment successful"
+              exit 0
+            fi
+            if [ "$HEALTH" = "Red" ]; then
+              echo "Deployment failed — environment health is Red"
+              exit 1
+            fi
+            sleep $INTERVAL
+            elapsed=$((elapsed + INTERVAL))
+          done
+          echo "Timeout: deployment did not complete within ${TIMEOUT}s"
+          exit 1
