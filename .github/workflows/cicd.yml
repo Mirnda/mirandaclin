@@ -79,31 +79,46 @@ jobs:
             --source-bundle S3Bucket=${{ secrets.EB_S3_BUCKET }},S3Key=mirandaclin-${{ env.VERSION }}.zip
 
       - name: Sync environment variables
+        env:
+          EB_NS: aws:elasticbeanstalk:application:environment
         run: |
-          aws elasticbeanstalk update-environment \
-            --application-name mirandaclin \
-            --environment-name mirandaclin-prod \
-            --option-settings \
-              Namespace=aws:elasticbeanstalk:application:environment,OptionName=APP_ENV,Value=production \
-              Namespace=aws:elasticbeanstalk:application:environment,OptionName=APP_PORT,Value=8080 \
-              Namespace=aws:elasticbeanstalk:application:environment,OptionName=RATE_LIMIT_ENABLED,Value=${{ secrets.RATE_LIMIT_ENABLED }} \
-              Namespace=aws:elasticbeanstalk:application:environment,OptionName=CORS_ALLOWED_ORIGINS,Value=${{ secrets.CORS_ALLOWED_ORIGINS }} \
-              Namespace=aws:elasticbeanstalk:application:environment,OptionName=DB_HOST,Value=${{ secrets.DB_HOST }} \
-              Namespace=aws:elasticbeanstalk:application:environment,OptionName=DB_PORT,Value=${{ secrets.DB_PORT }} \
-              Namespace=aws:elasticbeanstalk:application:environment,OptionName=DB_USER,Value=${{ secrets.DB_USER }} \
-              Namespace=aws:elasticbeanstalk:application:environment,OptionName=DB_PASS,Value=${{ secrets.DB_PASS }} \
-              Namespace=aws:elasticbeanstalk:application:environment,OptionName=DB_NAME,Value=${{ secrets.DB_NAME }} \
-              Namespace=aws:elasticbeanstalk:application:environment,OptionName=DB_SSLMODE,Value=${{ secrets.DB_SSLMODE }} \
-              Namespace=aws:elasticbeanstalk:application:environment,OptionName=REDIS_ADDR,Value=${{ secrets.REDIS_ADDR }} \
-              Namespace=aws:elasticbeanstalk:application:environment,OptionName=REDIS_PASSWORD,Value=${{ secrets.REDIS_PASSWORD }} \
-              Namespace=aws:elasticbeanstalk:application:environment,OptionName=REDIS_DB,Value=${{ secrets.REDIS_DB }} \
-              Namespace=aws:elasticbeanstalk:application:environment,OptionName=JWT_SECRET,Value=${{ secrets.JWT_SECRET }} \
-              Namespace=aws:elasticbeanstalk:application:environment,OptionName=JWT_ISSUER,Value=${{ secrets.JWT_ISSUER }} \
-              Namespace=aws:elasticbeanstalk:application:environment,OptionName=SMTP_HOST,Value=${{ secrets.SMTP_HOST }} \
-              Namespace=aws:elasticbeanstalk:application:environment,OptionName=SMTP_PORT,Value=${{ secrets.SMTP_PORT }} \
-              Namespace=aws:elasticbeanstalk:application:environment,OptionName=SMTP_USER,Value=${{ secrets.SMTP_USER }} \
-              Namespace=aws:elasticbeanstalk:application:environment,OptionName=SMTP_PASS,Value=${{ secrets.SMTP_PASS }} \
-              Namespace=aws:elasticbeanstalk:application:environment,OptionName=SMTP_FROM,Value=${{ secrets.SMTP_FROM }}
+          python3 - <<'EOF'
+          import json, os, subprocess
+
+          ns = os.environ["EB_NS"]
+          settings = [
+            ("APP_ENV",            "${{ secrets.APP_ENV }}"),
+            ("APP_PORT",           "${{ secrets.APP_PORT }}"),
+            ("RATE_LIMIT_ENABLED", "${{ secrets.RATE_LIMIT_ENABLED }}"),
+            ("CORS_ALLOWED_ORIGINS","${{ secrets.CORS_ALLOWED_ORIGINS }}"),
+            ("DB_HOST",            "${{ secrets.DB_HOST }}"),
+            ("DB_PORT",            "${{ secrets.DB_PORT }}"),
+            ("DB_USER",            "${{ secrets.DB_USER }}"),
+            ("DB_PASS",            "${{ secrets.DB_PASS }}"),
+            ("DB_NAME",            "${{ secrets.DB_NAME }}"),
+            ("DB_SSLMODE",         "${{ secrets.DB_SSLMODE }}"),
+            ("REDIS_ADDR",         "${{ secrets.REDIS_ADDR }}"),
+            ("REDIS_PASSWORD",     "${{ secrets.REDIS_PASSWORD }}"),
+            ("REDIS_DB",           "${{ secrets.REDIS_DB }}"),
+            ("JWT_SECRET",         "${{ secrets.JWT_SECRET }}"),
+            ("JWT_ISSUER",         "${{ secrets.JWT_ISSUER }}"),
+            ("SMTP_HOST",          "${{ secrets.SMTP_HOST }}"),
+            ("SMTP_PORT",          "${{ secrets.SMTP_PORT }}"),
+            ("SMTP_USER",          "${{ secrets.SMTP_USER }}"),
+            ("SMTP_PASS",          "${{ secrets.SMTP_PASS }}"),
+            ("SMTP_FROM",          "${{ secrets.SMTP_FROM }}"),
+          ]
+          option_settings = [
+            {"Namespace": ns, "OptionName": k, "Value": v}
+            for k, v in settings
+          ]
+          subprocess.run([
+            "aws", "elasticbeanstalk", "update-environment",
+            "--application-name", "mirandaclin",
+            "--environment-name",  "mirandaclin-prod",
+            "--option-settings",   json.dumps(option_settings),
+          ], check=True)
+          EOF
 
       - name: Deploy application version
         run: |
