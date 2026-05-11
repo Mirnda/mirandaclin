@@ -115,10 +115,6 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("config validation returned error: %v", err)
 	}
 
-	if cfg.App.Env == "production" && cfg.DB.SSLMode == "disable" {
-		return nil, fmt.Errorf("DB_SSLMODE=disable é proibido em production")
-	}
-
 	return &cfg, nil
 }
 
