@@ -127,8 +127,10 @@ jobs:
           ], check=True)
           EOF
 
-      - name: Diagnose EB region
+      - name: Diagnose AWS identity and EB region
         run: |
+          echo "=== Caller identity ==="
+          aws sts get-caller-identity
           echo "=== Configured region: $AWS_DEFAULT_REGION ==="
           echo "=== All EB applications in this region ==="
           aws elasticbeanstalk describe-applications --output json | \
