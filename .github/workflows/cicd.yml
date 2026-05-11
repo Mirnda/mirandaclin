@@ -62,7 +62,7 @@ jobs:
 
       - name: Create deployment zip
         run: |
-          VERSION=$(git rev-parse --short HEAD)-${{ github.run_number }}
+          VERSION=$(git rev-parse --short HEAD)-$(date +%m%d%H%M)
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           zip -r mirandaclin-$VERSION.zip bin/ Procfile .platform/ .ebextensions/
 
