@@ -116,16 +116,10 @@ jobs:
             "aws", "elasticbeanstalk", "update-environment",
             "--application-name", "mirandaclin",
             "--environment-name",  "mirandaclin-prod",
+            "--version-label",     "${{ env.VERSION }}",
             "--option-settings",   json.dumps(option_settings),
           ], check=True)
           EOF
-
-      - name: Deploy application version
-        run: |
-          aws elasticbeanstalk update-environment \
-            --application-name mirandaclin \
-            --environment-name mirandaclin-prod \
-            --version-label ${{ env.VERSION }}
 
       - name: Wait for deployment
         run: |
