@@ -182,6 +182,8 @@ jobs:
               sudo yum install -y nginx
             fi
 
+
+            sudo mkdir -p /etc/nginx/sites-available/
             NGINX_SITE=/etc/nginx/sites-available/${{ secrets.APP_NAME }}
             if [ ! -f "$NGINX_SITE" ]; then
               {
