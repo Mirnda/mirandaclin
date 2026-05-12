@@ -56,12 +56,7 @@ jobs:
             --key-name "${{ secrets.EC2_ACCESS_KEY_NAME }}" \
             --security-group-ids "${{ secrets.EC2_SG_ID }}" \ 
             --tag-specifications \
-            "ResourceType=instance,Tags=[
-              {Key=Name,Value=${{ secrets.APP_NAME }}-${{ steps.branch.outputs.branch }}},
-              {Key=Branch,Value=${{ steps.branch.outputs.branch }}},
-              {Key=ExpiresAt,Value=$(date -d "+3 hours" +%Y-%m-%dT%H:%M:%SZ)},
-              {Key=Environment,Value=${{ secrets.APP_ENV }}}
-            ]" \
+            "ResourceType=instance,Tags=[ {Key=Name,Value=${{ secrets.APP_NAME }}-${{ steps.branch.outputs.branch }}}, {Key=Branch,Value=${{ steps.branch.outputs.branch }}}, {Key=ExpiresAt,Value=$(date -d "+3 hours" +%Y-%m-%dT%H:%M:%SZ)}, {Key=Environment,Value=${{ secrets.APP_ENV }}} ]" \
             --query 'Instances[0].InstanceId' \
             --output text)
 
