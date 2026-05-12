@@ -51,10 +51,10 @@ jobs:
         id: create
         run: |
           INSTANCE_ID=$(aws ec2 run-instances \
-            --image-id "${{ secrets.EC2_IMAGE_ID }}" \ 
+            --image-id "${{ secrets.EC2_IMAGE_ID }}" \
             --instance-type "${{ secrets.EC2_INSTANCE_TYPE }}" \
             --key-name "${{ secrets.EC2_ACCESS_KEY_NAME }}" \
-            --security-group-ids "${{ secrets.EC2_SG_ID }}" \ 
+            --security-group-ids "${{ secrets.EC2_SG_ID }}" \
             --tag-specifications \
             "ResourceType=instance,Tags=[ {Key=Name,Value=${{ secrets.APP_NAME }}-${{ steps.branch.outputs.branch }}}, {Key=Branch,Value=${{ steps.branch.outputs.branch }}}, {Key=ExpiresAt,Value=$(date -d "+3 hours" +%Y-%m-%dT%H:%M:%SZ)}, {Key=Environment,Value=${{ secrets.APP_ENV }}} ]" \
             --query 'Instances[0].InstanceId' \
@@ -103,37 +103,37 @@ jobs:
               echo "env file exist"
             else
               sudo mkdir -p /etc/${{ secrets.APP_NAME }}
-              cat <<EOF | sudo tee $ENV_FILE
-              APP_NAME=${{ secrets.APP_NAME }}
-              APP_PORT=${{ secrets.APP_PORT }}
-              APP_ENV=${{ secrets.APP_ENV }}
-              APP_HOST=${{ secrets.APP_HOST }}
-              RATE_LIMIT_ENABLED=${{ secrets.RATE_LIMIT_ENABLED }}
-              CORS_ALLOWED_ORIGINS=${{ secrets.CORS_ALLOWED_ORIGINS }}
-              CLIENT_HOSTNAME=${{ secrets.CLIENT_HOSTNAME }}
-              CLIENT_PORT=${{ secrets.CLIENT_PORT }}
-              CLIENT_VERIFY_EMAIL_URL=${{ secrets.CLIENT_VERIFY_EMAIL_URL }}
-              DB_DRIVER=${{ secrets.DB_DRIVER }}
-              DB_HOST=${{ secrets.DB_HOST }}
-              DB_PORT=${{ secrets.DB_PORT }}
-              DB_USER=${{ secrets.DB_USER }}
-              DB_PASS=${{ secrets.DB_PASS }}
-              DB_NAME=${{ secrets.DB_NAME }}
-              DB_SSLMODE=${{ secrets.DB_SSLMODE }}
-              REDIS_ADDR=${{ secrets.REDIS_ADDR }}
-              REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
-              REDIS_DB=${{ secrets.REDIS_DB }}
-              JWT_ISSUER=${{ secrets.JWT_ISSUER }}
-              JWT_JWKS_URL=${{ secrets.JWT_JWKS_URL }}
-              JWT_SECRET=${{ secrets.JWT_SECRET }}
-              SMTP_HOST=${{ secrets.SMTP_HOST }}
-              SMTP_PORT=${{ secrets.SMTP_PORT }}
-              SMTP_USER=${{ secrets.SMTP_USER }}
-              SMTP_PASS=${{ secrets.SMTP_PASS }}
-              SMTP_FROM=${{ secrets.SMTP_FROM }}
-              GRAFANA_USER=${{ secrets.GRAFANA_USER }}
-              GRAFANA_PASSWORD=${{ secrets.GRAFANA_PASSWORD }}
-              EOF
+              {
+              echo "APP_NAME=${{ secrets.APP_NAME }}"
+              echo "APP_PORT=${{ secrets.APP_PORT }}"
+              echo "APP_ENV=${{ secrets.APP_ENV }}"
+              echo "APP_HOST=${{ secrets.APP_HOST }}"
+              echo "RATE_LIMIT_ENABLED=${{ secrets.RATE_LIMIT_ENABLED }}"
+              echo "CORS_ALLOWED_ORIGINS=${{ secrets.CORS_ALLOWED_ORIGINS }}"
+              echo "CLIENT_HOSTNAME=${{ secrets.CLIENT_HOSTNAME }}"
+              echo "CLIENT_PORT=${{ secrets.CLIENT_PORT }}"
+              echo "CLIENT_VERIFY_EMAIL_URL=${{ secrets.CLIENT_VERIFY_EMAIL_URL }}"
+              echo "DB_DRIVER=${{ secrets.DB_DRIVER }}"
+              echo "DB_HOST=${{ secrets.DB_HOST }}"
+              echo "DB_PORT=${{ secrets.DB_PORT }}"
+              echo "DB_USER=${{ secrets.DB_USER }}"
+              echo "DB_PASS=${{ secrets.DB_PASS }}"
+              echo "DB_NAME=${{ secrets.DB_NAME }}"
+              echo "DB_SSLMODE=${{ secrets.DB_SSLMODE }}"
+              echo "REDIS_ADDR=${{ secrets.REDIS_ADDR }}"
+              echo "REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}"
+              echo "REDIS_DB=${{ secrets.REDIS_DB }}"
+              echo "JWT_ISSUER=${{ secrets.JWT_ISSUER }}"
+              echo "JWT_JWKS_URL=${{ secrets.JWT_JWKS_URL }}"
+              echo "JWT_SECRET=${{ secrets.JWT_SECRET }}"
+              echo "SMTP_HOST=${{ secrets.SMTP_HOST }}"
+              echo "SMTP_PORT=${{ secrets.SMTP_PORT }}"
+              echo "SMTP_USER=${{ secrets.SMTP_USER }}"
+              echo "SMTP_PASS=${{ secrets.SMTP_PASS }}"
+              echo "SMTP_FROM=${{ secrets.SMTP_FROM }}"
+              echo "GRAFANA_USER=${{ secrets.GRAFANA_USER }}"
+              echo "GRAFANA_PASSWORD=${{ secrets.GRAFANA_PASSWORD }}"
+              } | sudo tee $ENV_FILE > /dev/null
               sudo chmod 600 $ENV_FILE
               echo "env file created"
             fi
@@ -142,23 +142,23 @@ jobs:
             if [ -f "$SERVICE_FILE" ] && [[ "${{ steps.branch.outputs.branch }}" != "master" && "${{ steps.branch.outputs.branch }}" != "main" ]]; then
               echo "env file exist"
             else
-              cat <<EOF | sudo tee $SERVICE_FILE
-              [Unit]
-              Description=My Go App - ${{ secrets.APP_NAME }}
-              After=network.target
-              [Service]
-              Type=simple
-              User=${{ secrets.APP_USER }}
-              WorkingDirectory=/home/${{ secrets.APP_USER }}/app
-              EnvironmentFile=$ENV_FILE
-              ExecStart=/home/${{ secrets.APP_USER }}/app/bin/${{ secrets.APP_NAME }}
-              Restart=always
-              RestartSec=2
-              [Install]
-              WantedBy=multi-user.target
-              EOF
+              {
+              echo "[Unit]"
+              echo "Description=My Go App - ${{ secrets.APP_NAME }}"
+              echo "After=network.target"
+              echo "[Service]"
+              echo "Type=simple"
+              echo "User=${{ secrets.APP_USER }}"
+              echo "WorkingDirectory=/home/${{ secrets.APP_USER }}/app"
+              echo "EnvironmentFile=$ENV_FILE"
+              echo "ExecStart=/home/${{ secrets.APP_USER }}/app/bin/${{ secrets.APP_NAME }}"
+              echo "Restart=always"
+              echo "RestartSec=2"
+              echo "[Install]"
+              echo "WantedBy=multi-user.target"
+              } | sudo tee $SERVICE_FILE > /dev/null
             fi
 
             sudo systemctl daemon-reload
-            sudo systemctl enable ${{ secrets.APP_USER }}
-            sudo systemctl restart ${{ secrets.APP_USER }}
+            sudo systemctl enable ${{ secrets.APP_NAME }}
+            sudo systemctl restart ${{ secrets.APP_NAME }}
