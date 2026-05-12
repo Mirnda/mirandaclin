@@ -46,6 +46,19 @@ jobs:
 
           echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
 
+      - name: Start instance if stopped
+        if: steps.ec2.outputs.instance_id != ''
+        run: |
+          STATE=$(aws ec2 describe-instances \
+            --instance-ids ${{ steps.ec2.outputs.instance_id }} \
+            --query 'Reservations[0].Instances[0].State.Name' \
+            --output text)
+
+          if [ "$STATE" = "stopped" ]; then
+            aws ec2 start-instances --instance-ids ${{ steps.ec2.outputs.instance_id }}
+            aws ec2 wait instance-running --instance-ids ${{ steps.ec2.outputs.instance_id }}
+          fi
+
       - name: Create EC2 instance
         if: steps.ec2.outputs.instance_id == ''
         id: create
@@ -107,7 +120,7 @@ jobs:
               echo "APP_NAME=${{ secrets.APP_NAME }}"
               echo "APP_PORT=${{ secrets.APP_PORT }}"
               echo "APP_ENV=${{ secrets.APP_ENV }}"
-              echo "APP_HOST=${{ secrets.APP_HOST }}"
+              echo "APP_HOST=${{ steps.ip.outputs.ip }}"
               echo "RATE_LIMIT_ENABLED=${{ secrets.RATE_LIMIT_ENABLED }}"
               echo "CORS_ALLOWED_ORIGINS=${{ secrets.CORS_ALLOWED_ORIGINS }}"
               echo "CLIENT_HOSTNAME=${{ secrets.CLIENT_HOSTNAME }}"
