@@ -183,7 +183,8 @@ jobs:
             fi
 
 
-            sudo mkdir -p /etc/nginx/sites-available/
+            sudo mkdir -p /etc/nginx/sites-available/ 
+            sudo mkdir -p /etc/nginx/sites-enabled/ 
             NGINX_SITE=/etc/nginx/sites-available/${{ secrets.APP_NAME }}
             if [ ! -f "$NGINX_SITE" ]; then
               {
