@@ -51,11 +51,10 @@ jobs:
         id: create
         run: |
           INSTANCE_ID=$(aws ec2 run-instances \
-            --image-id ${{ vars.EC2_IMAGE_ID }} \ # amazon linux ft elegible
-            --instance-type ${{ vars.EC2_INSTANCE_TYPE }} \
-            --key-name ${{ vars.EC2_ACCESS_KEY_NAME }} \
-            --security-group-ids ${{ vars.EC2_SG_ID }} \
-            # --subnet-id subnet-xxxxxxxx \
+            --image-id "${{ secrets.EC2_IMAGE_ID }}" \ 
+            --instance-type "${{ secrets.EC2_INSTANCE_TYPE }}" \
+            --key-name "${{ secrets.EC2_ACCESS_KEY_NAME }}" \
+            --security-group-ids "${{ secrets.EC2_SG_ID }}" \ 
             --tag-specifications \
             "ResourceType=instance,Tags=[
               {Key=Name,Value=${{ secrets.APP_NAME }}-${{ steps.branch.outputs.branch }}},
