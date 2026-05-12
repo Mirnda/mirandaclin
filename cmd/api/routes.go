@@ -17,6 +17,7 @@ import (
 	"github.com/Mirnda/mirandaclin/internal/middleware"
 	"github.com/Mirnda/mirandaclin/pkg/config"
 	"github.com/Mirnda/mirandaclin/pkg/logger"
+	"github.com/Mirnda/mirandaclin/pkg/response"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	_ "github.com/Mirnda/mirandaclin/docs"
@@ -55,6 +56,12 @@ func registerRoutes(mux *http.ServeMux, h handlers, cfg *config.Config, c cache.
 	reportProtect := func(handler http.Handler) http.Handler {
 		return reportRL(authMw(handler))
 	}
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		response.OK(w, "OK", map[string]any{
+			"message": "Server running",
+		})
+	})
 
 	// Swagger — disponível apenas fora de produção
 	if cfg.App.Env != "production" {
