@@ -1,0 +1,170 @@
+name: AWS_CD
+
+on:
+  push:
+    branches: [cicd]
+
+
+jobs:
+  build_and_deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    environment:
+      name: prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Build binary
+        run: |
+          mkdir -p bin
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/mirandaclin ./cmd/api
+
+      - name: Extract branch name
+        id: branch
+        run: |
+          BRANCH=$(git branch --show-current | tr '/' '-')
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Check existing instance
+        id: ec2
+        run: |
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Branch,Values=${{ steps.branch.outputs.branch }}" \
+                      "Name=instance-state-name,Values=running,pending,stopped" \
+            --query "Reservations[*].Instances[*].InstanceId" --output text)
+
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+
+      - name: Create EC2 instance
+        if: steps.ec2.outputs.instance_id == ''
+        id: create
+        run: |
+          INSTANCE_ID=$(aws ec2 run-instances \
+            --image-id ${{ vars.EC2_IMAGE_ID }} \ # amazon linux ft elegible
+            --instance-type ${{ vars.EC2_INSTANCE_TYPE }} \
+            --key-name ${{ vars.EC2_ACCESS_KEY_NAME }} \
+            --security-group-ids ${{ vars.EC2_SG_ID }} \
+            # --subnet-id subnet-xxxxxxxx \
+            --tag-specifications \
+            "ResourceType=instance,Tags=[
+              {Key=Name,Value=${{ secrets.APP_NAME }}-${{ steps.branch.outputs.branch }}},
+              {Key=Branch,Value=${{ steps.branch.outputs.branch }}},
+              {Key=ExpiresAt,Value=$(date -d "+3 hours" +%Y-%m-%dT%H:%M:%SZ)},
+              {Key=Environment,Value=${{ secrets.APP_ENV }}}
+            ]" \
+            --query 'Instances[0].InstanceId' \
+            --output text)
+
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+
+      - name: Wait for EC2
+        if: steps.ec2.outputs.instance_id == ''
+        run: aws ec2 wait instance-running --instance-ids ${{ steps.create.outputs.instance_id }}
+
+      - name: Get public IP
+        id: ip
+        run: |
+          INSTANCE_ID="${{ steps.ec2.outputs.instance_id }}"
+
+          if [ -z "$INSTANCE_ID" ]; then
+            INSTANCE_ID="${{ steps.create.outputs.instance_id }}"
+          fi
+
+          IP=$(aws ec2 describe-instances \
+            --instance-ids $INSTANCE_ID \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' \
+            --output text)
+
+          echo "ip=$IP" >> $GITHUB_OUTPUT
+
+      - name: Copy image to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ steps.ip.outputs.ip }}
+          username: ${{ secrets.APP_USER }}
+          key: ${{ secrets.APP_KEY }}
+          source: "bin"
+          target: "/home/${{ secrets.APP_USER }}/app/"
+
+      - name: Configure service and restart
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ steps.ip.outputs.ip }}
+          username: ${{ secrets.APP_USER }}
+          key: ${{ secrets.APP_KEY }}
+          script: |
+            ENV_FILE=/etc/${{ secrets.APP_NAME }}/app.env
+            if [ -f "$ENV_FILE" ] && [[ "${{ steps.branch.outputs.branch }}" != "master" && "${{ steps.branch.outputs.branch }}" != "main" ]]; then
+              echo "env file exist"
+            else
+              sudo mkdir -p /etc/${{ secrets.APP_NAME }}
+              cat <<EOF | sudo tee $ENV_FILE
+              APP_NAME=${{ secrets.APP_NAME }}
+              APP_PORT=${{ secrets.APP_PORT }}
+              APP_ENV=${{ secrets.APP_ENV }}
+              APP_HOST=${{ secrets.APP_HOST }}
+              RATE_LIMIT_ENABLED=${{ secrets.RATE_LIMIT_ENABLED }}
+              CORS_ALLOWED_ORIGINS=${{ secrets.CORS_ALLOWED_ORIGINS }}
+              CLIENT_HOSTNAME=${{ secrets.CLIENT_HOSTNAME }}
+              CLIENT_PORT=${{ secrets.CLIENT_PORT }}
+              CLIENT_VERIFY_EMAIL_URL=${{ secrets.CLIENT_VERIFY_EMAIL_URL }}
+              DB_DRIVER=${{ secrets.DB_DRIVER }}
+              DB_HOST=${{ secrets.DB_HOST }}
+              DB_PORT=${{ secrets.DB_PORT }}
+              DB_USER=${{ secrets.DB_USER }}
+              DB_PASS=${{ secrets.DB_PASS }}
+              DB_NAME=${{ secrets.DB_NAME }}
+              DB_SSLMODE=${{ secrets.DB_SSLMODE }}
+              REDIS_ADDR=${{ secrets.REDIS_ADDR }}
+              REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+              REDIS_DB=${{ secrets.REDIS_DB }}
+              JWT_ISSUER=${{ secrets.JWT_ISSUER }}
+              JWT_JWKS_URL=${{ secrets.JWT_JWKS_URL }}
+              JWT_SECRET=${{ secrets.JWT_SECRET }}
+              SMTP_HOST=${{ secrets.SMTP_HOST }}
+              SMTP_PORT=${{ secrets.SMTP_PORT }}
+              SMTP_USER=${{ secrets.SMTP_USER }}
+              SMTP_PASS=${{ secrets.SMTP_PASS }}
+              SMTP_FROM=${{ secrets.SMTP_FROM }}
+              GRAFANA_USER=${{ secrets.GRAFANA_USER }}
+              GRAFANA_PASSWORD=${{ secrets.GRAFANA_PASSWORD }}
+              EOF
+              sudo chmod 600 $ENV_FILE
+              echo "env file created"
+            fi
+
+            SERVICE_FILE=/etc/systemd/system/${{ secrets.APP_NAME }}.service
+            if [ -f "$SERVICE_FILE" ] && [[ "${{ steps.branch.outputs.branch }}" != "master" && "${{ steps.branch.outputs.branch }}" != "main" ]]; then
+              echo "env file exist"
+            else
+              cat <<EOF | sudo tee $SERVICE_FILE
+              [Unit]
+              Description=My Go App - ${{ secrets.APP_NAME }}
+              After=network.target
+              [Service]
+              Type=simple
+              User=${{ secrets.APP_USER }}
+              WorkingDirectory=/home/${{ secrets.APP_USER }}/app
+              EnvironmentFile=$ENV_FILE
+              ExecStart=/home/${{ secrets.APP_USER }}/app/bin/${{ secrets.APP_NAME }}
+              Restart=always
+              RestartSec=2
+              [Install]
+              WantedBy=multi-user.target
+              EOF
+            fi
+
+            sudo systemctl daemon-reload
+            sudo systemctl enable ${{ secrets.APP_USER }}
+            sudo systemctl restart ${{ secrets.APP_USER }}
