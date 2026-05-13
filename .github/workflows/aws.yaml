@@ -187,7 +187,7 @@ jobs:
             {
             echo "server {"
             echo "    listen 80;"
-            echo "    server_name ${{ steps.ip.outputs.dns }} ${{ steps.ip.outputs.ip }};"
+            echo "    server_name ${{ steps.ip.outputs.dns }};"
             echo "    location / {"
             echo "        proxy_pass http://localhost:${{ secrets.APP_PORT }};"
             echo "        proxy_http_version 1.1;"
@@ -198,6 +198,9 @@ jobs:
             echo "    }"
             echo "}"
             } | sudo tee $NGINX_SITE > /dev/null
+
+            sudo grep -q 'server_names_hash_bucket_size' /etc/nginx/nginx.conf \
+                && echo "já configurado" || sudo sed -i '/http {/a\\tserver_names_hash_bucket_size 128;' /etc/nginx/nginx.conf
 
             sudo rm -f /etc/nginx/sites-enabled/default
 
