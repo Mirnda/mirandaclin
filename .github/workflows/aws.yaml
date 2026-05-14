@@ -41,6 +41,7 @@ jobs:
         run: |
           INSTANCE_ID=$(aws ec2 describe-instances \
             --filters "Name=tag:Branch,Values=${{ steps.branch.outputs.branch }}" \
+                      "Name=tag:Service,Values=${{ secrets.APP_NAME }}" \
                       "Name=instance-state-name,Values=running,pending,stopped" \
             --query "Reservations[*].Instances[*].InstanceId" --output text)
 
@@ -69,7 +70,7 @@ jobs:
             --key-name "${{ secrets.EC2_ACCESS_KEY_NAME }}" \
             --security-group-ids "${{ secrets.EC2_SG_ID }}" \
             --tag-specifications \
-            "ResourceType=instance,Tags=[ {Key=Name,Value=${{ secrets.APP_NAME }}-${{ steps.branch.outputs.branch }}}, {Key=Branch,Value=${{ steps.branch.outputs.branch }}}, {Key=ExpiresAt,Value=$(date -d "+3 hours" +%Y-%m-%dT%H:%M:%SZ)}, {Key=Environment,Value=${{ secrets.APP_ENV }}} ]" \
+            "ResourceType=instance,Tags=[ {Key=Name,Value=${{ secrets.APP_NAME }}-${{ steps.branch.outputs.branch }}}, {Key=Branch,Value=${{ steps.branch.outputs.branch }}}, {Key=Service,Value=${{ secrets.APP_NAME }}}, {Key=ExpiresAt,Value=$(date -d "+3 hours" +%Y-%m-%dT%H:%M:%SZ)}, {Key=Environment,Value=${{ secrets.APP_ENV }}} ]" \
             --query 'Instances[0].InstanceId' \
             --output text)
 
